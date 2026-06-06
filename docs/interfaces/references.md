@@ -68,6 +68,28 @@ type ReferenceCandidate struct {
 }
 ```
 
+### BibTeX 候选入口
+
+当前实现位于 `internal/references/bibtex.go`，供材料解析模块把用户提供的 `.bib` 文件转换为候选文献：
+
+```go
+type BibTeXEntry struct {
+    Type   string            `json:"type"`
+    Key    string            `json:"key"`
+    Fields map[string]string `json:"fields"`
+}
+
+func ParseBibTeX(data []byte) ([]BibTeXEntry, error)
+func CandidatesFromBibTeX(entries []BibTeXEntry, startIndex int) []contracts.ReferenceCandidate
+```
+
+转换规则：
+
+- candidate ID 从 `startIndex` 开始，格式 `cand_001`。
+- `source` 固定为 `bibtex`，`status` 固定为 `pending`。
+- `title` / `author` / `year` / `doi` / `url` / `abstract` / `journal` / `booktitle` / `publisher` 从 BibTeX 字段映射。
+- `dedupe_group` 优先使用 DOI，其次 URL，最后回退到 `bibtex:<entry key>`。
+
 ## 2. 确认文献
 
 ```go

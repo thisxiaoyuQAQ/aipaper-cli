@@ -1,0 +1,3 @@
+Plain text fixture for material parsing.
+
+This note should be preserved as extracted text and indexed into chunks.

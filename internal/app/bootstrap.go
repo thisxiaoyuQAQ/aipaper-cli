@@ -23,9 +23,10 @@ func Bootstrap(workDir string, cfg config.Config) (InitResult, error) {
 		return result, err
 	}
 
+	now := time.Now().UTC()
 	run := contracts.Run{
-		RunID:        "run-" + time.Now().UTC().Format("20060102T150405.000000000Z"),
-		CreatedAt:    time.Now().UTC(),
+		RunID:        "run-" + now.Format("20060102T150405.000000000Z"),
+		CreatedAt:    now,
 		Provider:     cfg.Provider,
 		Model:        cfg.Model,
 		CostEstimate: map[string]any{},
@@ -38,10 +39,10 @@ func Bootstrap(workDir string, cfg config.Config) (InitResult, error) {
 		CompletedChapters: []string{},
 		PendingChapters:   []string{},
 	}
-	if err := writeCreateOnly(s.RunPath(), run, &result); err != nil {
+	if err := writeInitialJSON(s.RunPath(), run, &contracts.Run{}, &result); err != nil {
 		return result, err
 	}
-	if err := writeCreateOnly(s.ProgressPath(), progress, &result); err != nil {
+	if err := writeInitialJSON(s.ProgressPath(), progress, &contracts.Progress{}, &result); err != nil {
 		return result, err
 	}
 	return result, nil
@@ -59,7 +60,15 @@ func LoadProgress(workDir string) (contracts.Progress, bool, error) {
 	return progress, true, nil
 }
 
-func writeCreateOnly(path string, value any, result *InitResult) error {
+func writeInitialJSON(path string, value any, existing any, result *InitResult) error {
+	err := store.ReadJSON(path, existing)
+	if err == nil {
+		result.Existing = append(result.Existing, path)
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	res, err := store.WriteJSON(path, value, store.CreateOnly)
 	if err != nil {
 		return err

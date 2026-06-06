@@ -108,6 +108,15 @@ func Merge(base, override Config) Config {
 
 func MergeProvider(base, override ProviderConfig) ProviderConfig {
 	out := base
+	if len(base.Models) > 0 {
+		out.Models = append([]string(nil), base.Models...)
+	}
+	if len(base.Extra) > 0 {
+		out.Extra = map[string]any{}
+		for k, v := range base.Extra {
+			out.Extra[k] = v
+		}
+	}
 	if override.Type != "" {
 		out.Type = override.Type
 	}

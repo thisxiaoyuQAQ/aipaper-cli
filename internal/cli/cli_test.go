@@ -1,0 +1,128 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	configpkg "github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
+)
+
+func TestInitCommandCreatesLayoutAndIsIdempotent(t *testing.T) {
+	setIsolatedHome(t)
+	workDir := t.TempDir()
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"init", "--workdir", workDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("first init code = %d, stderr = %s", code, stderr.String())
+	}
+	s := store.New(workDir)
+	for _, dir := range store.RequiredDirs() {
+		info, err := os.Stat(s.Path(dir))
+		if err != nil {
+			t.Fatalf("stat %s: %v", dir, err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("%s is not a directory", dir)
+		}
+	}
+	runBefore := mustRead(t, s.RunPath())
+	progressBefore := mustRead(t, s.ProgressPath())
+
+	stdout.Reset()
+	stderr.Reset()
+	code = Run(context.Background(), []string{"init", "--workdir", workDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("second init code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "existing:") {
+		t.Fatalf("second init output did not report existing files: %s", stdout.String())
+	}
+	if !bytes.Equal(runBefore, mustRead(t, s.RunPath())) {
+		t.Fatalf("second init changed run.json")
+	}
+	if !bytes.Equal(progressBefore, mustRead(t, s.ProgressPath())) {
+		t.Fatalf("second init changed progress.json")
+	}
+}
+
+func TestConfigCommandRedactsAPIKeys(t *testing.T) {
+	setIsolatedHome(t)
+	workDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	writeText(t, configPath, `{
+  "provider": "openrouter",
+  "model": "gpt-4.1",
+  "providers": {
+    "openrouter": {
+      "type": "openai-compatible",
+      "api_key": "secret-api-key",
+      "base_url": "https://openrouter.ai/api/v1"
+    }
+  }
+}`)
+
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"config", "--workdir", workDir, "--config", configPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("config code = %d, stderr = %s", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "secret-api-key") {
+		t.Fatalf("config output leaked API key: %s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "redacted") {
+		t.Fatalf("config output did not redact API key: %s", stdout.String())
+	}
+
+	var out struct {
+		Loaded []string         `json:"loaded"`
+		Config configpkg.Config `json:"config"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &out); err != nil {
+		t.Fatalf("config output is not JSON: %v\n%s", err, stdout.String())
+	}
+	if out.Config.Providers["openrouter"].APIKey != "redacted" {
+		t.Fatalf("redacted provider = %#v", out.Config.Providers["openrouter"])
+	}
+}
+
+func TestStatusCommandReportsNotInitialized(t *testing.T) {
+	workDir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"status", "--workdir", workDir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("status code = %d, stderr = %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "status: not initialized") {
+		t.Fatalf("status output = %s", stdout.String())
+	}
+}
+
+func setIsolatedHome(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	return data
+}
+
+func writeText(t *testing.T, path, data string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+}

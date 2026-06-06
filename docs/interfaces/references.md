@@ -88,7 +88,21 @@ func CandidatesFromBibTeX(entries []BibTeXEntry, startIndex int) []contracts.Ref
 - candidate ID 从 `startIndex` 开始，格式 `cand_001`。
 - `source` 固定为 `bibtex`，`status` 固定为 `pending`。
 - `title` / `author` / `year` / `doi` / `url` / `abstract` / `journal` / `booktitle` / `publisher` 从 BibTeX 字段映射。
-- `dedupe_group` 优先使用 DOI，其次 URL，最后回退到 `bibtex:<entry key>`。
+- `dedupe_group` 复用统一去重规则：优先 DOI，其次 URL，最后回退到 title+firstAuthor+year hash。
+
+### 去重与 ID 工具
+
+当前实现位于 `internal/references/dedupe.go`，供搜索模块与材料模块共用：
+
+```go
+func DedupeCandidates(candidates []contracts.ReferenceCandidate) []contracts.ReferenceCandidate
+func AssignCandidateIDs(candidates []contracts.ReferenceCandidate, startIndex int) []contracts.ReferenceCandidate
+func CandidateDedupeGroup(candidate contracts.ReferenceCandidate) string
+func NormalizeDOI(doi string) string
+func NormalizeURL(raw string) string
+```
+
+`DedupeCandidates` 按 DOI、URL、title+firstAuthor+year hash 三层规则分组；同组内保留字段更完整的一条，并用较完整候选补齐缺失字段。
 
 ## 2. 确认文献
 

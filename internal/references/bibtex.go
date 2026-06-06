@@ -79,18 +79,18 @@ func CandidatesFromBibTeX(entries []BibTeXEntry, startIndex int) []contracts.Ref
 		doi := fields["doi"]
 		url := fields["url"]
 		candidate := contracts.ReferenceCandidate{
-			ID:          fmt.Sprintf("cand_%03d", startIndex+i),
-			Title:       title,
-			Authors:     splitAuthors(fields["author"]),
-			Year:        parseYear(fields["year"]),
-			Source:      "bibtex",
-			DOI:         doi,
-			URL:         url,
-			Abstract:    fields["abstract"],
-			Venue:       firstNonEmpty(fields["journal"], fields["booktitle"], fields["publisher"]),
-			DedupeGroup: dedupeGroup(entry.Key, doi, url),
-			Status:      "pending",
+			ID:       fmt.Sprintf("cand_%03d", startIndex+i),
+			Title:    title,
+			Authors:  splitAuthors(fields["author"]),
+			Year:     parseYear(fields["year"]),
+			Source:   "bibtex",
+			DOI:      doi,
+			URL:      url,
+			Abstract: fields["abstract"],
+			Venue:    firstNonEmpty(fields["journal"], fields["booktitle"], fields["publisher"]),
+			Status:   "pending",
 		}
+		candidate.DedupeGroup = CandidateDedupeGroup(candidate)
 		candidates = append(candidates, candidate)
 	}
 	return candidates
@@ -226,17 +226,6 @@ func splitAuthors(value string) []string {
 func parseYear(value string) int {
 	year, _ := strconv.Atoi(strings.TrimSpace(value))
 	return year
-}
-
-func dedupeGroup(key, doi, url string) string {
-	switch {
-	case strings.TrimSpace(doi) != "":
-		return "doi:" + strings.ToLower(strings.TrimSpace(doi))
-	case strings.TrimSpace(url) != "":
-		return "url:" + strings.TrimSpace(url)
-	default:
-		return "bibtex:" + strings.TrimSpace(key)
-	}
 }
 
 func firstNonEmpty(values ...string) string {

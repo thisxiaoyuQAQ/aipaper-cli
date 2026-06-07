@@ -35,6 +35,62 @@ Coordinator 可调用工具：
 | `checkpoint` | step 记录和恢复事实读取 |
 | `export` | Markdown、Docx、报告导出 |
 
+## 运行时接口（05 已实现）
+
+`internal/app.NewAgentRuntime` 负责创建 Coordinator runtime：
+
+- 输入：`config.Config`、工作目录、可选恢复 prompt、可选测试用 mock model、可选 Writer runner。
+- 输出：`AgentRuntime`，包含 `*agentcore.Agent`、实际 provider/model、system prompt、工具列表和 Store。
+- 模型：通过 `github.com/voocel/agentcore/llm` 创建，底层 provider 配置使用 `github.com/voocel/litellm`。
+- role 配置：优先使用 `roles.coordinator.provider/model/max_turns/temperature`，否则回落到顶层 `provider/model`。
+- secret：`api_key` 支持 `env:NAME`，解析后只传给模型，不写入事件。
+
+已注册的第一版事实工具：
+
+| 工具名 | 说明 |
+|---|---|
+| `requirements_read` | 读取 `requirements.json` |
+| `progress_read` | 读取 `progress.json` |
+| `references_confirmed_read` | 返回 confirmed references 数量和 key 列表；缺文件视为 0 |
+| `checkpoint_validate_latest` | 返回 latest checkpoint 校验事实 |
+| `writer_run` | Writer 边界工具；无 confirmed references 时拒绝调用 Writer runner |
+
+工具统一返回：
+
+```json
+{
+  "ok": true,
+  "data": {}
+}
+```
+
+失败时：
+
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "AGENT_INVALID_JSON",
+    "message": "error details",
+    "retryable": false
+  }
+}
+```
+
+当前错误码：
+
+| code | 说明 |
+|---|---|
+| `AGENT_INVALID_JSON` | Coordinator 需要结构化输出时返回了非法 JSON、未知字段或缺少 action |
+| `REFERENCE_NONE_CONFIRMED` | Writer 在无 confirmed references 时被调用 |
+| `AGENT_TOOL_FAILED` | 工具读取 Store 或下游 runner 失败 |
+
+事件投影：
+
+- `internal/agent.ProjectEvent` 将 `agentcore.Event` 转为 `contracts.RunEvent`。
+- 投影保留 agent、tool、progress summary、错误和运行摘要。
+- 不复制工具参数和结果，避免 API key 或长正文进入日志。
+
 ## Architect 输出
 
 Architect 生成：

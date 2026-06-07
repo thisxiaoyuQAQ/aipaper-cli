@@ -22,6 +22,10 @@
 - Host 输入：合并后的 `config.Config`、Store、恢复事实。
 - Coordinator 可用工具组：requirements、materials、search、references、artifacts、checkpoint、export。
 - 子 Agent：Architect、Writer、Editor，各自隔离 context，通过 Store artifacts 协作。
+- 第一版实际工具名：`requirements_read`、`progress_read`、`references_confirmed_read`、`checkpoint_validate_latest`、`writer_run`。
+- 工具统一返回 `{ok:true,data}` 或 `{ok:false,error:{code,message,retryable,details}}`。
+- 当前错误码：`AGENT_INVALID_JSON`、`REFERENCE_NONE_CONFIRMED`、`AGENT_TOOL_FAILED`。
+- 运行时入口：`app.NewAgentRuntime`，测试可注入 mock `agentcore.ChatModel` 和 mock Writer runner。
 
 ## 实现要点
 
@@ -42,7 +46,7 @@
 ## 产出清单
 
 - internal/agent/
-- internal/host/ 或 internal/app/agent_bootstrap.go
+- internal/app/agent_runtime.go
 - docs/interfaces/agent.md
 - 对应 `*_test.go`
 

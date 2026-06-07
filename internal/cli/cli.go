@@ -22,8 +22,9 @@ Usage:
   aipaper-cli recover [--workdir DIR]
   aipaper-cli config [--workdir DIR] [--config FILE]
 
-Milestone 1 provides the storage, config, and checkpoint foundation. The TUI,
-agent loop, material parsing, search, and export flows are implemented later.
+Current build includes the Store/config foundation, requirements and reference
+TUI models, material parsing, academic search, artifact quality gates,
+checkpoint recovery, final export, and deterministic E2E smoke coverage.
 `
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {

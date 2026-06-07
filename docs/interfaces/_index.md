@@ -13,7 +13,7 @@
 | [references.md](./references.md) | 候选文献 / 确认文献结构、示例与 reference key 生成规则 | `internal/contracts/types.go` |
 | [artifacts.md](./artifacts.md) | Outline / Claims / CitationMap / Review 等写作产物契约与章节状态机 | `internal/contracts/types.go` |
 | [checkpoint.md](./checkpoint.md) | `Checkpoint` / `OutputArtifact` / `Validation` / `RecoveryResult`、step 列表、崩溃一致性与幂等 | `internal/checkpoint/checkpoint.go`、`internal/app/recover.go` |
-| [export.md](./export.md) | `final/` 交付产物契约与 `citation-trace.json` 字段 | spec 第 4/7 节（无独立 Go 结构体） |
+| [export.md](./export.md) | `final/` 交付产物契约与 `citation-trace.json` 字段 | `internal/export` |
 | [config.md](./config.md) | `Config` / `ProviderConfig` / `RoleConfig`、查找顺序与合并规则 | `internal/config/config.go` |
 | [agent.md](./agent.md) | Architect / Writer / Editor 输入输出契约、引用硬规则与质量门控阈值 | spec 第 3 节 + `internal/contracts/types.go` |
 

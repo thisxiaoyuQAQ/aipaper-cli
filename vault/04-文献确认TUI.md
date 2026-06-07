@@ -19,6 +19,10 @@
 
 ## 接口与类型
 
+- `references.LoadCandidates(store.Store)`：读取 `references/candidates.json`。
+- `references.ConfirmCandidates(store, candidates, ConfirmationDecision)`：写出 confirmed/rejected/BibTeX。
+- `references.ReferenceKey` / `UniqueReferenceKey`：生成稳定 key，冲突追加 A/B 后缀。
+- `referencestui.NewModel` / `Model.UpdateKey` / `Model.View` / `Model.Decision`：可测试 TUI model 层，后续可接 Bubble Tea runtime。
 - 输入：`references/candidates.json`
 - 输出：`references/confirmed.json`、`references/rejected.json`、`references/confirmed.bib`
 - 交互键：Space 选择 / 取消，Enter 确认，`/` 搜索，`s` 排序，`a` 全选高相关，`r` 拒绝，`q` 返回或退出。

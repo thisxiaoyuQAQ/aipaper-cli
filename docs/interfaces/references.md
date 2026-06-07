@@ -152,6 +152,51 @@ type ConfirmedReference struct {
 }
 ```
 
+### 确认与拒绝落盘入口
+
+当前实现位于 `internal/references/confirm.go`：
+
+```go
+type ConfirmationDecision struct {
+    ConfirmedIDs []string
+    RejectedIDs  []string
+    ConfirmedAt  time.Time
+}
+
+type ConfirmationResult struct {
+    Confirmed contracts.ConfirmedReferences
+    Rejected  contracts.ReferenceCandidates
+    Outputs   []string
+}
+
+func LoadCandidates(s store.Store) (contracts.ReferenceCandidates, error)
+func ConfirmCandidates(s store.Store, candidates contracts.ReferenceCandidates, decision ConfirmationDecision) (ConfirmationResult, error)
+func ReferenceKey(candidate contracts.ReferenceCandidate) string
+func UniqueReferenceKey(candidate contracts.ReferenceCandidate, used map[string]int) string
+func FormatConfirmedBibTeX(confirmed contracts.ConfirmedReferences) string
+```
+
+输出文件：
+
+- `references/confirmed.json`：`ConfirmedReferences`
+- `references/rejected.json`：`ReferenceCandidates`，其中每个 rejected item 的 `status="rejected"`
+- `references/confirmed.bib`：由 `ConfirmedReferences` 导出的 BibTeX
+
+未确认任何文献时，`ConfirmCandidates` 返回 `REFERENCE_NONE_CONFIRMED`，供后续写作流程阻塞。
+
+### TUI model 入口
+
+当前实现位于 `internal/tui/references`，采用可测试的 model/view/update 分层，后续可由 Bubble Tea runtime 桥接：
+
+```go
+func NewModel(candidates contracts.ReferenceCandidates) Model
+func (m Model) UpdateKey(key string) Model
+func (m Model) View() string
+func (m Model) Decision(now time.Time) references.ConfirmationDecision
+```
+
+已支持选择、取消、搜索、排序、全选高相关、拒绝、确认和退出状态。
+
 ## 3. reference key 生成规则
 
 格式 `firstAuthorYearShortTitle`（spec 第 7 节）：

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/app"
-	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/checkpoint"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
@@ -113,9 +112,13 @@ func runRecover(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	validation := checkpoint.ValidateLatest(store.New(*workDir))
-	writePretty(stdout, validation)
-	if !validation.OK {
+	result, err := app.Recover(*workDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "recover: %v\n", err)
+		return 1
+	}
+	writePretty(stdout, result)
+	if !result.OK {
 		return 1
 	}
 	return 0

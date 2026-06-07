@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
@@ -62,6 +64,9 @@ func Record(s store.Store, cp Checkpoint, progress contracts.Progress) error {
 		return err
 	}
 	if _, err := store.WriteJSON(s.StepCheckpointPath(cp.Step), cp, store.CreateOnly); err != nil {
+		if strings.Contains(err.Error(), "artifact conflict") {
+			return fmt.Errorf("STORE_CHECKPOINT_CONFLICT: %w", err)
+		}
 		return err
 	}
 	if _, err := store.WriteJSON(s.LatestCheckpointPath(), cp, store.Overwrite); err != nil {
@@ -100,30 +105,56 @@ func ValidateLatest(s store.Store) Validation {
 		Next:  cp.NextExpected,
 	}
 	for _, out := range cp.Outputs {
-		if filepath.IsAbs(out.Path) {
+		outputPath, err := cleanOutputPath(out.Path)
+		if err != nil {
 			v.OK = false
-			v.Errors = append(v.Errors, fmt.Sprintf("output path must be relative: %s", out.Path))
+			v.Errors = append(v.Errors, err.Error())
 			continue
 		}
-		path := filepath.Clean(s.Path(filepath.FromSlash(out.Path)))
-		if !isWithin(path, s.Root()) {
+		diskPath := filepath.Clean(s.Path(filepath.FromSlash(outputPath)))
+		if !isWithin(diskPath, s.Root()) {
 			v.OK = false
 			v.Errors = append(v.Errors, fmt.Sprintf("output path escapes store root: %s", out.Path))
 			continue
 		}
-		sum, err := store.FileSHA256(path)
+		sum, err := store.FileSHA256(diskPath)
 		if err != nil {
 			v.OK = false
 			v.Errors = append(v.Errors, fmt.Sprintf("read %s: %v", out.Path, err))
 			continue
 		}
-		v.Checked = append(v.Checked, out.Path)
+		v.Checked = append(v.Checked, outputPath)
 		if sum != out.SHA256 {
 			v.OK = false
 			v.Errors = append(v.Errors, fmt.Sprintf("hash mismatch for %s", out.Path))
 		}
 	}
 	return v
+}
+
+func cleanOutputPath(outputPath string) (string, error) {
+	if outputPath == "" {
+		return "", errors.New("output path is required")
+	}
+	if strings.Contains(outputPath, "\\") {
+		return "", fmt.Errorf("output path must use forward slashes: %s", outputPath)
+	}
+	if path.IsAbs(outputPath) || filepath.IsAbs(outputPath) || filepath.VolumeName(outputPath) != "" || hasWindowsVolume(outputPath) {
+		return "", fmt.Errorf("output path must be relative: %s", outputPath)
+	}
+	cleaned := path.Clean(outputPath)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("output path escapes store root: %s", outputPath)
+	}
+	return cleaned, nil
+}
+
+func hasWindowsVolume(outputPath string) bool {
+	if len(outputPath) < 2 || outputPath[1] != ':' {
+		return false
+	}
+	letter := outputPath[0]
+	return letter >= 'A' && letter <= 'Z' || letter >= 'a' && letter <= 'z'
 }
 
 func isWithin(path, root string) bool {

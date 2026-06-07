@@ -167,8 +167,16 @@ type ReviewScores struct {
 | `claims-vN.json` | 第 N 版关键论断 |
 | `citation-map-vN.json` | 第 N 版引用映射 |
 | `review-vN.json` | 第 N 版 Editor 评审 |
+| `review-vN.md` | 第 N 版 Editor 人类可读评审摘要（可选） |
 | `writer_notes.md` | Writer 的 gap / 待补充说明 |
 | `accepted.md` | 通过后定稿正文 |
+
+首版实现位于 `internal/artifacts/`：
+
+- `DraftPath` / `ClaimsPath` / `CitationMapPath` / `ReviewPath` / `ReviewMarkdownPath` / `WriterNotesPath` / `AcceptedPath`：生成相对 Store 根的正斜杠路径；`chapter_id` 只允许字母、数字、`_`、`-`，版本号必须大于 0。
+- `WriteDraftBundle(store.Store, DraftBundle)`：原子写入 `draft-vN.md`、`claims-vN.json`、`citation-map-vN.json`，可选覆盖 `writer_notes.md`；版本化 artifact 使用 CreateOnly，同内容幂等、不同内容冲突。
+- `WriteReview(store.Store, contracts.Review, markdown string)`：原子写入 `review-vN.json`，可选写入 `review-vN.md`。
+- `CommitAccepted(store.Store, chapterID, version, review)`：仅当 review 元数据匹配且通过质量门控时，将对应草稿写入 `accepted.md`。
 
 ## 6. 章节状态机（spec 第 3 节质量门控）
 
@@ -187,3 +195,21 @@ drafting ──> reviewing ──> accepted ──> committed
 | `accepted` | 章节通过门控 |
 | `needs_human_review` | 超过重写上限（2 轮）仍未通过，标记后继续后续章节，不中断流程 |
 | `committed` | 章节写入最终稿集合 |
+
+实现类型与阈值：
+
+- `ChapterState`：记录 `chapter_id`、`status`、`draft_version`、`revision_rounds`。
+- `EvaluateReview`：要求 `review.passed == true`、`overall >= 80`、`citation_consistency >= 90`、`unsupported_claims` 为空。
+- `StatusAfterReview`：未通过且重写轮数小于 2 时返回 `revision_required`；达到 2 轮后返回 `needs_human_review`。
+
+## 7. 产物一致性校验
+
+`ValidateDraftArtifacts(claims, citationMap, confirmed)` 用于检查 Writer/Editor 可消费的结构化事实：
+
+| Code | 含义 |
+| --- | --- |
+| `ARTIFACT_MISSING_CLAIMS` | claims 文件为空 |
+| `ARTIFACT_MISSING_CITATION_MAP` | citation map 为空 |
+| `ARTIFACT_UNKNOWN_CLAIM` | citation map 引用了不存在的 claim |
+| `ARTIFACT_UNCONFIRMED_REFERENCE` | claim 或 citation map 引用了未确认文献 key |
+| `ARTIFACT_HIGH_CLAIM_MISSING_REFERENCE` | 高重要性 claim 没有任何引用支撑 |

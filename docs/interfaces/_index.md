@@ -7,7 +7,7 @@
 | 文件 | 一句话说明 | 对应 Go 包 / 源文件 |
 | --- | --- | --- |
 | [common.md](./common.md) | 公共类型：结构化错误契约、错误码枚举、原子写入约定、Progress / Run / RunEvent | `internal/contracts/types.go`、`internal/store/atomic.go`、`internal/store/hash.go` |
-| [requirements.md](./requirements.md) | 写作需求 `Requirements` 结构、`requirements.json` 示例与校验规则 | `internal/contracts/types.go` |
+| [requirements.md](./requirements.md) | 写作需求 `Requirements` 结构、`requirements.json` 示例与校验规则 | `internal/contracts/types.go`、`internal/tui/requirements` |
 | [materials.md](./materials.md) | 材料清单 `MaterialManifest` / `MaterialItem`、`manifest.json` 示例与格式支持分层 | `internal/contracts/types.go` |
 | [search.md](./search.md) | 学术搜索输入、数据源、标准化字段与去重策略 | `internal/contracts/types.go`（复用 `ReferenceCandidate`） |
 | [references.md](./references.md) | 候选文献 / 确认文献结构、示例与 reference key 生成规则 | `internal/contracts/types.go` |

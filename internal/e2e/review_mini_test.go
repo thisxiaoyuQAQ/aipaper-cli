@@ -17,6 +17,7 @@ import (
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/search"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
+	requirementstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/requirements"
 )
 
 type mockProvider struct{}
@@ -43,7 +44,7 @@ func TestE2EReviewMini(t *testing.T) {
 		t.Fatalf("Bootstrap() error = %v", err)
 	}
 	s := store.New(workDir)
-	req := reviewMiniRequirements()
+	req := reviewMiniRequirements(t)
 	if _, err := store.WriteJSON(s.RequirementsPath(), req, store.Overwrite); err != nil {
 		t.Fatalf("write requirements: %v", err)
 	}
@@ -184,8 +185,9 @@ func TestE2EReviewMini(t *testing.T) {
 	assertFinalArtifacts(t, s, confirmed)
 }
 
-func reviewMiniRequirements() contracts.Requirements {
-	return contracts.Requirements{
+func reviewMiniRequirements(t *testing.T) contracts.Requirements {
+	t.Helper()
+	model := requirementstui.NewModel(contracts.Requirements{
 		Topic:             "Retrieval augmented generation for literature review writing",
 		ResearchQuestions: []string{"How should confirmed references constrain generated reviews?"},
 		Scope:             "mini review",
@@ -195,7 +197,16 @@ func reviewMiniRequirements() contracts.Requirements {
 		MaterialDir:       "../../fixtures/review-mini/materials",
 		AllowOnlineSearch: true,
 		SearchProviders:   []string{"mock_search"},
+	})
+	model = model.UpdateKey("enter")
+	if !model.Done() || model.Err() != nil {
+		t.Fatalf("requirements form did not submit: done=%v err=%v", model.Done(), model.Err())
 	}
+	req, err := model.Requirements()
+	if err != nil {
+		t.Fatalf("Requirements() error = %v", err)
+	}
+	return req
 }
 
 func combineCandidates(materialCandidates, searchCandidates []contracts.ReferenceCandidate) contracts.ReferenceCandidates {

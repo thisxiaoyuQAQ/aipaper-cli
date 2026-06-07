@@ -2,7 +2,7 @@
 
 TUI 表单收集的结构化写作需求，落盘为 `output/aipaper/requirements.json`。
 
-来源：`internal/contracts/types.go` 的 `Requirements`；示例与字段语义见 spec 第 4 节。
+来源：`internal/contracts/types.go` 的 `Requirements`；表单 model 位于 `internal/tui/requirements`；示例与字段语义见 spec 第 4 节。
 
 ## 结构定义
 
@@ -74,3 +74,20 @@ type Requirements struct {
 7. `research_questions` 建议非空，便于 Coordinator 生成搜索查询；为空不阻塞但会降低搜索召回。
 
 校验通过后写入 `requirements.json`，对应 checkpoint step `collect_requirements`。
+
+## TUI model 入口
+
+当前实现采用可测试的 model/view/update 分层，后续可由 Bubble Tea runtime 桥接：
+
+```go
+func NewModel(defaults contracts.Requirements) Model
+func (m Model) UpdateKey(key string) Model
+func (m Model) SetField(field Field, value string) Model
+func (m Model) Requirements() (contracts.Requirements, error)
+func Validate(req contracts.Requirements) error
+```
+
+- `UpdateKey("tab")` / `UpdateKey("shift+tab")` 在字段间移动。
+- `UpdateKey("space")` 在 `allow_online_search` 字段切换布尔值；其他字段输入空格。
+- `UpdateKey("enter")` 校验并提交；失败时 `Model.Err()` 返回错误。
+- `Requirements()` 会归一化默认语言、引用格式、布尔值、逗号分隔搜索源和多行列表。

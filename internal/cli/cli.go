@@ -138,7 +138,7 @@ func runConfig(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "load config: %v\n", err)
 		return 1
 	}
-	redactConfig(&cfg)
+	cfg = config.Redact(cfg)
 	out := struct {
 		Loaded []string      `json:"loaded"`
 		Config config.Config `json:"config"`
@@ -154,15 +154,6 @@ func writePretty(w io.Writer, value any) {
 		return
 	}
 	fmt.Fprintln(w, string(data))
-}
-
-func redactConfig(cfg *config.Config) {
-	for name, provider := range cfg.Providers {
-		if provider.APIKey != "" {
-			provider.APIKey = "redacted"
-			cfg.Providers[name] = provider
-		}
-	}
 }
 
 func cleanAll(paths []string) []string {

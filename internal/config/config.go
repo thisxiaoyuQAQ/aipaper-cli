@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
 const (
@@ -57,6 +60,14 @@ func ProjectPath(workDir string) string {
 		workDir = "."
 	}
 	return filepath.Join(workDir, ProjectFile)
+}
+
+func SaveProject(workDir string, cfg Config) (string, error) {
+	path := ProjectPath(workDir)
+	if _, err := store.WriteJSON(path, cfg, store.Overwrite); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func Load(opts LoadOptions) (Config, []string, error) {
@@ -173,6 +184,55 @@ func (c Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+func Redact(cfg Config) Config {
+	out := cfg
+	if len(cfg.Providers) > 0 {
+		out.Providers = map[string]ProviderConfig{}
+		for name, provider := range cfg.Providers {
+			if provider.APIKey != "" {
+				provider.APIKey = "redacted"
+			}
+			if len(provider.Models) > 0 {
+				provider.Models = append([]string(nil), provider.Models...)
+			}
+			if len(provider.Extra) > 0 {
+				extra := map[string]any{}
+				for key, value := range provider.Extra {
+					extra[key] = value
+				}
+				provider.Extra = extra
+			}
+			out.Providers[name] = provider
+		}
+	}
+	if len(cfg.Roles) > 0 {
+		out.Roles = map[string]RoleConfig{}
+		for name, role := range cfg.Roles {
+			out.Roles[name] = role
+		}
+	}
+	return out
+}
+
+func MaskSecret(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(value, "env:") {
+		return value
+	}
+	runes := []rune(value)
+	if len(runes) <= 4 {
+		return "redacted"
+	}
+	prefix := ""
+	if len(runes) > 7 {
+		prefix = string(runes[:3])
+	}
+	return prefix + "..." + string(runes[len(runes)-4:])
 }
 
 func read(path string) (Config, bool, error) {

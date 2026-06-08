@@ -184,6 +184,60 @@ func TestLoadReturnsParseErrors(t *testing.T) {
 	}
 }
 
+func TestSaveProjectWritesLoadableConfig(t *testing.T) {
+	home := t.TempDir()
+	workDir := t.TempDir()
+	setHome(t, home)
+	cfg := Config{
+		Provider:        "default",
+		Model:           "gpt-test",
+		DefaultLanguage: "zh-CN",
+		CitationStyle:   "gbt7714",
+		Providers: map[string]ProviderConfig{
+			"default": {Type: "openai", APIKey: "env:OPENAI_API_KEY", BaseURL: "https://api.openai.com/v1"},
+		},
+	}
+
+	path, err := SaveProject(workDir, cfg)
+	if err != nil {
+		t.Fatalf("SaveProject() error = %v", err)
+	}
+	if path != ProjectPath(workDir) {
+		t.Fatalf("path = %q, want %q", path, ProjectPath(workDir))
+	}
+	loaded, paths, err := Load(LoadOptions{WorkDir: workDir})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !reflect.DeepEqual(paths, []string{path}) {
+		t.Fatalf("loaded paths = %#v, want %#v", paths, []string{path})
+	}
+	if loaded.Provider != cfg.Provider || loaded.Model != cfg.Model {
+		t.Fatalf("loaded config = %#v", loaded)
+	}
+}
+
+func TestRedactAndMaskSecretDoNotExposeAPIKeys(t *testing.T) {
+	cfg := Config{Providers: map[string]ProviderConfig{
+		"default": {APIKey: "secret-api-key"},
+		"env":     {APIKey: "env:OPENAI_API_KEY"},
+	}}
+
+	redacted := Redact(cfg)
+	if redacted.Providers["default"].APIKey != "redacted" || redacted.Providers["env"].APIKey != "redacted" {
+		t.Fatalf("redacted config = %#v", redacted.Providers)
+	}
+	if cfg.Providers["default"].APIKey != "secret-api-key" {
+		t.Fatalf("Redact mutated source config")
+	}
+	if got := MaskSecret("secret-api-key"); got == "" || strings.Contains(got, "secret-api-key") {
+		t.Fatalf("MaskSecret() = %q", got)
+	}
+	if got := MaskSecret("env:OPENAI_API_KEY"); got != "env:OPENAI_API_KEY" {
+		t.Fatalf("MaskSecret(env) = %q", got)
+	}
+}
+
 func setHome(t *testing.T, home string) {
 	t.Helper()
 	t.Setenv("HOME", home)

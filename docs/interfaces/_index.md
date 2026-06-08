@@ -16,6 +16,7 @@
 | [export.md](./export.md) | `final/` 交付产物契约与 `citation-trace.json` 字段 | `internal/export` |
 | [config.md](./config.md) | `Config` / `ProviderConfig` / `RoleConfig`、查找顺序与合并规则 | `internal/config/config.go` |
 | [agent.md](./agent.md) | Architect / Writer / Editor 输入输出契约、引用硬规则与质量门控阈值 | spec 第 3 节 + `internal/contracts/types.go` |
+| [tui.md](./tui.md) | TUI 增量屏幕状态机、ConfigWizard 模板、RuntimeEvent 与 UsageSnapshot 契约 | `internal/tui/app`、`internal/tui/configwizard`、`internal/tui/writing`（待实现） |
 
 ## 通用约定
 

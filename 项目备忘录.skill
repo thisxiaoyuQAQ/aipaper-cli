@@ -1,0 +1,92 @@
+# 项目备忘录
+
+## 项目概述
+
+`aipaper-cli` 是面向学术综述 / 文献综述写作的 AI Agent CLI：通过 TUI 收集写作需求和文献确认，由 Coordinator 调度 Architect、Writer、Editor 完成大纲、章节草稿、评审、重写、导出，并保留可追踪、可恢复的结构化产物。
+
+## 技术栈
+
+- 语言：Go 1.25
+- Agent：`github.com/voocel/agentcore` v1.6.11
+- LLM 适配：`github.com/voocel/litellm` v1.6.15
+- TUI：Bubble Tea、Bubbles、Lip Gloss
+- Store：本地文件系统，`output/aipaper/`
+- 写入策略：temp + fsync + rename，JSON 独立校验
+
+## 核心约定
+
+- Store 根目录：`output/aipaper/`
+- 时间格式：Go `time.Time` 序列化为 RFC3339 UTC
+- 路径格式：checkpoint artifact 路径必须是相对 Store 根的正斜杠路径
+- ID 策略：run 使用时间戳 ID；材料用 `material_001`；候选文献用 `cand_001`；引用 key 用 `firstAuthorYearShortTitle`
+- 错误处理：工具失败返回 `{ok:false,error:{code,message,retryable,details}}`
+- 引用硬规则：Writer 和 Editor 只能使用 `references/confirmed.json`
+- 质量门控：单章总分 >= 80，引用一致性 >= 90，无高风险 unsupported claim；最多重写 2 轮
+- TUI 增量原则：TUI 编排屏幕，Host 执行运行时，Coordinator 决策写作流程，Store 是状态权威
+
+## 模块依赖关系
+
+```text
+01-09 MVP 已完成
+
+10-无参数TUI启动与RootModel骨架
+  ├─ 11-ConfigWizard配置向导
+  └─ 12-启动状态探测与恢复入口
+       └─ 13-Requirements屏幕桥接与落盘
+            └─ 14-MaterialsScan与候选材料入口
+                 └─ 15-SearchProgress与候选合并
+                      └─ 16-References屏幕桥接与确认落盘
+                           └─ 17-WritingProgress四区布局与Runtime事件桥
+                                ├─ 18-暂停退出与安全恢复
+                                └─ 19-ExportSummary与完成页
+                                     └─ 20-用户文档与README快速入口
+                                          └─ 21-TUI全流程测试与Windows双击验收
+```
+
+## 文档指针
+
+- 已批准 MVP 设计稿：`docs/superpowers/specs/2026-06-05-aipaper-cli-design.md`
+- TUI 全流程增量设计稿：`docs/superpowers/specs/2026-06-08-tui-full-generation-user-guide-design.md`
+- 合并需求与架构：`docs/需求与架构.md`
+- TUI 增量需求：`docs/TUI全流程增量需求.md`
+- TUI 增量架构：`docs/TUI全流程增量架构设计.md`
+- TUI 增量开发流程：`docs/TUI全流程详细开发流程.md`
+- 接口定义索引：`docs/interfaces/_index.md`
+- TUI 接口补充：`docs/interfaces/tui.md`
+- 开发进度：`docs/开发进度.md`
+- 修复记录：`docs/修复记录.md`（如不存在，首次修复时创建）
+- 当前开发任务：`vault/10-*.md` 至 `vault/21-*.md`
+
+## 勿动文件清单
+
+- `internal/checkpoint/checkpoint.go`：checkpoint 记录、latest 校验、路径安全与 step 冲突语义已稳定
+- `internal/app/recover.go`：Host 恢复入口、恢复 prompt、`run.json.resumed_from` 更新已稳定
+- `internal/checkpoint/checkpoint_test.go`、`internal/app/recover_test.go`、`internal/cli/cli_test.go` 中恢复相关用例不应无故删除
+- `internal/agent/`：Coordinator prompt、step runner、事实工具、事件投影和结构化错误码已稳定
+- `internal/app/agent_runtime.go`：Host runtime builder、role/provider 解析、env secret 解析和 agentcore/litellm 接入已稳定；TUI 只在边界上扩展事件桥
+- `internal/artifacts/`：写作产物路径、原子写入、质量门控、confirmed references 校验与章节状态机已稳定
+- `internal/export/`：最终 Markdown、Docx、references、citation trace、report 导出接口已稳定；ExportSummary 必须复用 `LoadInput` / `ExportFinal`
+- `internal/tui/requirements/`：需求表单 model/view/update 与校验已稳定，后续只桥接，不重写
+- `internal/tui/references/`：文献确认 model/view/update、搜索/排序/拒绝/确认已稳定，后续只桥接，不重写
+
+## 分支策略
+
+- 默认在 main 分支线性开发
+- 若用户要求提交 / PR，再按当前 git 状态决定是否创建分支
+- 不主动覆盖用户未跟踪文件；修改 README 前先确认来源或保留迁移内容
+
+## Git Commit 规范
+
+- 格式：`<type>(<scope>): <description>`
+- 类型：`feat` / `fix` / `test` / `refactor` / `docs` / `chore`
+- 每完成一个功能点或一个可独立验证的文档变更提交一次；用户未要求时不要主动 commit
+
+## Agent 调度要点
+
+- 每个开发任务开始前必须读取本文件、对应 vault、`docs/TUI全流程增量需求.md`、`docs/TUI全流程增量架构设计.md`、`docs/interfaces/tui.md`
+- 调度顺序：编写 → 审查 → 测试 → 修复（最多 3 轮）→ 记录进度
+- 作者和审查必须分离；不要在同一主动上下文中自审通过
+- 代码实现优先复用 `internal/contracts`、`internal/store`、`internal/checkpoint`、`internal/config`
+- Host 只做可靠执行、事件投影、工具注册和恢复，不把写作调度规则写死在 Host
+- Coordinator 是唯一流程决策者，决策必须基于工具返回的结构化事实
+- 遇到删除/清空/覆盖既有 run 产物、README 大幅改写、真实 provider 调用等外向或不可逆操作，先请求用户确认

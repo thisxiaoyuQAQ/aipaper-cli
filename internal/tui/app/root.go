@@ -11,10 +11,13 @@ import (
 
 	runtimeapp "github.com/thisxiaoyuQAQ/aipaper-cli/internal/app"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/export"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/search"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/configwizard"
+	donetui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/done"
+	exportsummarytui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/exportsummary"
 	materialstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/materials"
 	referencestui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/references"
 	requirementstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/requirements"
@@ -59,6 +62,8 @@ type RootModel struct {
 	Search        searchtui.Model
 	References    referencestui.Model
 	Writing       writingtui.Model
+	ExportSummary exportsummarytui.Model
+	Done          donetui.Model
 	Probe         ProbeResult
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
@@ -131,6 +136,12 @@ func NewRootModel(opts RootOptions) RootModel {
 		writingModel := newWritingModel(m.WorkDir, m.ScreenData)
 		m.Writing = writingModel
 	}
+	if screen == ScreenExportSummary {
+		m.ExportSummary = newExportSummaryModel(m.WorkDir)
+	}
+	if screen == ScreenDone {
+		m.Done = newDoneModel(m.WorkDir, m.ScreenData)
+	}
 	return m
 }
 
@@ -169,6 +180,9 @@ func (m RootModel) Init() tea.Cmd {
 			return nil
 		}
 		return m.Writing.Init()
+	}
+	if m.CurrentScreen == ScreenExportSummary {
+		return m.ExportSummary.Init()
 	}
 	return nil
 }
@@ -242,6 +256,14 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Next == ScreenWriting {
 			m.Writing = writingModel
 			return m, m.Writing.Init()
+		}
+		if msg.Next == ScreenExportSummary {
+			m.ExportSummary = newExportSummaryModel(m.WorkDir)
+			return m, m.ExportSummary.Init()
+		}
+		if msg.Next == ScreenDone {
+			m.Done = newDoneModel(m.WorkDir, msg.Data)
+			return m, nil
 		}
 	case materialstui.ScanFinishedMsg:
 		if m.CurrentScreen == ScreenMaterialsScan {
@@ -335,6 +357,12 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentScreen == ScreenWriting {
 			return m.updateWriting(msg.String())
 		}
+		if m.CurrentScreen == ScreenExportSummary {
+			return m.updateExportSummary(msg.String())
+		}
+		if m.CurrentScreen == ScreenDone {
+			return m.updateDone(msg.String())
+		}
 		// Global Ctrl+C handling with confirmation for certain screens
 		switch msg.String() {
 		case "ctrl+c":
@@ -352,6 +380,15 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, tea.Quit
+		}
+	default:
+		if m.CurrentScreen == ScreenExportSummary {
+			updated, cmd := m.ExportSummary.Update(msg)
+			if exportModel, ok := updated.(exportsummarytui.Model); ok {
+				m.ExportSummary = exportModel
+				m.err = m.ExportSummary.Err()
+			}
+			return m, cmd
 		}
 	}
 	return m, nil
@@ -404,6 +441,12 @@ func (m RootModel) View() string {
 	}
 	if m.CurrentScreen == ScreenWriting {
 		return m.Writing.View()
+	}
+	if m.CurrentScreen == ScreenExportSummary {
+		return m.ExportSummary.View()
+	}
+	if m.CurrentScreen == ScreenDone {
+		return m.Done.View()
 	}
 	if m.err != nil {
 		return fmt.Sprintf("aipaper-cli\n\n%s\n\nError: %s\n", m.CurrentScreen, m.err)
@@ -695,9 +738,12 @@ func (m RootModel) updateWriting(key string) (tea.Model, tea.Cmd) {
 	m.err = m.Writing.Err()
 
 	if m.Writing.Done() {
-		// Writing completed, transition to ExportSummary
-		// For now, just quit (ExportSummary will be implemented in module 19)
-		return m, tea.Quit
+		// Writing completed, transition to ExportSummary and trigger export.
+		m.CurrentScreen = ScreenExportSummary
+		m.ScreenData = nil
+		m.ExportSummary = newExportSummaryModel(m.WorkDir)
+		m.err = nil
+		return m, m.ExportSummary.Init()
 	}
 
 	if m.Writing.Canceled() {
@@ -706,6 +752,46 @@ func (m RootModel) updateWriting(key string) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	return m, nil
+}
+
+func newExportSummaryModel(workDir string) exportsummarytui.Model {
+	return exportsummarytui.NewModel(exportsummarytui.Options{WorkDir: workDir})
+}
+
+func newDoneModel(workDir string, data any) donetui.Model {
+	opts := donetui.Options{WorkDir: workDir}
+	if result, ok := data.(export.Result); ok {
+		opts.Result = result
+	}
+	return donetui.NewModel(opts)
+}
+
+func (m RootModel) updateExportSummary(key string) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.ExportSummary, cmd = m.ExportSummary.UpdateKey(key)
+	m.err = m.ExportSummary.Err()
+
+	if m.ExportSummary.Canceled() {
+		return m, tea.Quit
+	}
+
+	if m.ExportSummary.Done() {
+		m.CurrentScreen = ScreenDone
+		m.ScreenData = m.ExportSummary.Result()
+		m.Done = newDoneModel(m.WorkDir, m.ExportSummary.Result())
+		m.err = nil
+		return m, nil
+	}
+
+	return m, cmd
+}
+
+func (m RootModel) updateDone(key string) (tea.Model, tea.Cmd) {
+	m.Done = m.Done.UpdateKey(key)
+	if m.Done.Quit() {
+		return m, tea.Quit
+	}
 	return m, nil
 }
 
@@ -759,6 +845,12 @@ func (m RootModel) currentScreenView() string {
 	}
 	if m.CurrentScreen == ScreenWriting {
 		return m.Writing.View()
+	}
+	if m.CurrentScreen == ScreenExportSummary {
+		return m.ExportSummary.View()
+	}
+	if m.CurrentScreen == ScreenDone {
+		return m.Done.View()
 	}
 	return fmt.Sprintf("aipaper-cli\n\n%s\n", m.CurrentScreen)
 }

@@ -73,6 +73,8 @@
 - `internal/tui/writing/`：WritingProgress 四区布局、RuntimeEvent 桥接、model/view/events 已稳定；两阶段停止（stopping→checkpoint saved→canceled）已稳定；真实 runtime 接入在边界扩展，不修改核心逻辑
 - `internal/tui/app/recover_prompt.go`：RecoverPrompt 继续/重开/退出交互、重开二次确认已稳定
 - `internal/tui/app/root.go` 中退出确认（exitConfirm）和 RuntimeStopRequestedMsg 转发已稳定；真实 runtime stop 调用待真实 runtime 接入时补充
+- `internal/tui/exportsummary/`：ExportSummary model/view、复用 export.LoadInput/ExportFinal、依赖注入（Export/DocxExporter/Now）、错误处理（CodeNoAcceptedChapters/CodeUnconfirmedReference/CodeDocxFailed）已稳定
+- `internal/tui/done/`：Done 完成页 model、Result 注入、输出目录/文件列表/命令提示已稳定
 
 ## 分支策略
 

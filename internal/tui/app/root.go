@@ -19,6 +19,7 @@ import (
 	referencestui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/references"
 	requirementstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/requirements"
 	searchtui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/search"
+	writingtui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/writing"
 )
 
 type Screen string
@@ -57,6 +58,7 @@ type RootModel struct {
 	Materials     materialstui.Model
 	Search        searchtui.Model
 	References    referencestui.Model
+	Writing       writingtui.Model
 	Probe         ProbeResult
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
@@ -121,6 +123,10 @@ func NewRootModel(opts RootOptions) RootModel {
 			m.References = referencesModel
 		}
 	}
+	if screen == ScreenWriting {
+		writingModel := newWritingModel(m.WorkDir, m.ScreenData)
+		m.Writing = writingModel
+	}
 	return m
 }
 
@@ -153,6 +159,12 @@ func (m RootModel) Init() tea.Cmd {
 			return nil
 		}
 		return m.Search.Init()
+	}
+	if m.CurrentScreen == ScreenWriting {
+		if m.err != nil {
+			return nil
+		}
+		return m.Writing.Init()
 	}
 	return nil
 }
@@ -191,6 +203,10 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		var writingModel writingtui.Model
+		if msg.Next == ScreenWriting {
+			writingModel = newWritingModel(m.WorkDir, msg.Data)
+		}
 		m.CurrentScreen = msg.Next
 		m.ScreenData = msg.Data
 		m.err = nil
@@ -217,6 +233,10 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Next == ScreenReferences {
 			m.References = referencesModel
 			return m, nil
+		}
+		if msg.Next == ScreenWriting {
+			m.Writing = writingModel
+			return m, m.Writing.Init()
 		}
 	case materialstui.ScanFinishedMsg:
 		if m.CurrentScreen == ScreenMaterialsScan {
@@ -285,6 +305,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentScreen == ScreenReferences {
 			return m.updateReferences(msg.String())
 		}
+		if m.CurrentScreen == ScreenWriting {
+			return m.updateWriting(msg.String())
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -331,6 +354,9 @@ func (m RootModel) View() string {
 			return view + "\nError: " + m.err.Error() + "\n"
 		}
 		return view
+	}
+	if m.CurrentScreen == ScreenWriting {
+		return m.Writing.View()
 	}
 	if m.err != nil {
 		return fmt.Sprintf("aipaper-cli\n\n%s\n\nError: %s\n", m.CurrentScreen, m.err)
@@ -594,8 +620,43 @@ func (m RootModel) updateReferences(key string) (tea.Model, tea.Cmd) {
 		// 成功确认，转场到 WritingProgress
 		m.CurrentScreen = ScreenWriting
 		m.ScreenData = result
+		m.Writing = newWritingModel(m.WorkDir, result)
 		m.err = nil
-		return m, nil
+		return m, m.Writing.Init()
+	}
+
+	return m, nil
+}
+
+func newWritingModel(workDir string, data any) writingtui.Model {
+	opts := writingtui.Options{
+		WorkDir: workDir,
+		Width:   120,
+		Height:  40,
+	}
+
+	// Check if this is a recovery scenario
+	if resumeData, ok := data.(WritingResumeData); ok {
+		opts.RecoveryPrompt = resumeData.RecoveryPrompt
+	}
+
+	return writingtui.NewModel(opts)
+}
+
+func (m RootModel) updateWriting(key string) (tea.Model, tea.Cmd) {
+	m.Writing = m.Writing.UpdateKey(key)
+	m.err = m.Writing.Err()
+
+	if m.Writing.Done() {
+		// Writing completed, transition to ExportSummary
+		// For now, just quit (ExportSummary will be implemented in module 19)
+		return m, tea.Quit
+	}
+
+	if m.Writing.Canceled() {
+		// User requested stop, checkpoint should be saved
+		// For now, just quit
+		return m, tea.Quit
 	}
 
 	return m, nil

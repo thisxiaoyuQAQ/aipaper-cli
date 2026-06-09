@@ -70,6 +70,7 @@
 - `internal/tui/references/`：文献确认 model/view/update、搜索/排序/拒绝/确认已稳定，后续只桥接，不重写
 - `internal/references/confirm.go`：LoadCandidates、ConfirmCandidates、confirmed/rejected/BibTeX 写入已稳定
 - `internal/tui/app/root.go` 中 References 桥接（newReferencesModel、updateReferences）已稳定
+- `internal/tui/writing/`：WritingProgress 四区布局、RuntimeEvent 桥接、model/view/events 已稳定；真实 runtime 接入在边界扩展，不修改核心逻辑
 
 ## 分支策略
 

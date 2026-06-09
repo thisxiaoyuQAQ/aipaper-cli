@@ -1,0 +1,25 @@
+## 交接单
+- 来源角色：修复 Agent
+- 目标角色：审查 Agent
+- 所属任务：vault/21-TUI全流程测试与Windows双击验收.md
+- 涉及文件：
+  - internal/e2e/tui_flow_test.go（补充审查发现的覆盖缺口）
+  - docs/开发进度.md（修正 Windows 双击验收表述）
+- 变更摘要：
+  - 新增 `TestTUIRootSearchProgressTransitionsToReferences`，通过 RootModel + SearchProgress model 的真实转场覆盖 Materials/Search 合并写 candidates 后进入 References，避免仅靠 domain 函数手动推进。
+  - 增强 `TestTUIConfigWizardOutputIsRuntimeResolvable`，使用 `t.Setenv("OPENAI_API_KEY", "test-runtime-key")` 后调用 `runtimeapp.ResolveRoleRuntime` 验证 coordinator/architect/writer/editor 角色确实可解析 provider/model/API key。
+  - 将开发进度验收总线表述从“已完成”修正为“自动化验收已完成；桌面双击交互待用户本机确认”，避免过度声明。
+- 下游 Agent 需额外读取：
+  - agent-output/transition/21-编写Agent.md
+  - 本交接单
+  - internal/e2e/tui_flow_test.go
+  - docs/开发进度.md
+  - docs/全量验收报告.md
+- 已执行验证：
+  - `go test ./internal/e2e/...`：通过
+  - `go test ./...`：通过
+  - `go build ./cmd/aipaper-cli`：通过
+  - `go build -o aipaper-cli.exe ./cmd/aipaper-cli`：通过
+- 已知风险/待确认项：
+  - `gofmt -w` 因工具安全分类器临时不可用未执行成功；但审查 Agent 此前已用 `gofmt -l` 验证文件格式无输出，后续可复核。
+  - 真正 Windows 桌面双击体验仍需用户本机确认。

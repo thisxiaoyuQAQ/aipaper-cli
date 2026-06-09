@@ -1,0 +1,35 @@
+## 交接单
+- 来源角色：编写 Agent
+- 目标角色：审查 Agent
+- 所属任务：vault/21-TUI全流程测试与Windows双击验收.md
+- 涉及文件：
+  - internal/e2e/tui_flow_test.go（新增）
+  - docs/开发进度.md（更新模块 21 状态与验收总线）
+  - docs/全量验收报告.md（新增 TUI 全流程增量验收记录）
+- 变更摘要：
+  - 新增 TUI mock 全流程契约测试，覆盖 StateProbe 屏幕推进：Requirements → MaterialsScan → References → WritingProgress → ExportSummary → Done。
+  - 验证材料 BibTeX 候选与 mock 搜索候选合并不丢失，并确认 References 无确认文献时阻塞写作。
+  - 验证 ConfigWizard/项目配置产出的 provider/role 映射可被 runtime/TUI StateProbe 解析。
+  - 验证用户文档包含 Windows exe 构建、输出路径、confirmed.bib 和 Ctrl+C 恢复说明。
+  - 更新开发进度和全量验收报告，记录 Windows exe 构建、CLI smoke、非交互 TUI 可读错误、真实 provider smoke 因无 API key 跳过。
+- 下游 Agent 需额外读取：
+  - 项目备忘录.skill（必读）
+  - vault/21-TUI全流程测试与Windows双击验收.md
+  - docs/TUI全流程增量需求.md
+  - docs/TUI全流程增量架构设计.md
+  - docs/interfaces/tui.md
+  - internal/e2e/tui_flow_test.go
+  - docs/开发进度.md
+  - docs/全量验收报告.md
+- 已执行验证：
+  - `go test ./internal/e2e/...`：通过
+  - `go test ./...`：通过
+  - `go build ./cmd/aipaper-cli`：通过
+  - `go build -o aipaper-cli.exe ./cmd/aipaper-cli`：通过
+  - `./aipaper-cli.exe --help`：通过
+  - `./aipaper-cli.exe status --workdir <tmp>`：通过
+  - `./aipaper-cli.exe` 非交互 stdin：输出可读 TUI 控制台错误，未 panic
+- 已知风险/待确认项：
+  - Claude 非交互 shell 无法执行真正的 Windows 桌面“双击 exe”验收；报告中已标记需用户桌面确认。
+  - 当前环境未检测到 provider API key，真实 provider 最小 smoke 已跳过并记录原因。
+  - 最后一次 `gofmt` 重跑因工具安全分类器临时不可用未能执行；新增测试此前已通过编译和 E2E。

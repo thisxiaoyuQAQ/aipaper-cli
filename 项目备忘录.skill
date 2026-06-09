@@ -75,6 +75,8 @@
 - `internal/tui/app/root.go` 中退出确认（exitConfirm）和 RuntimeStopRequestedMsg 转发已稳定；真实 runtime stop 调用待真实 runtime 接入时补充
 - `internal/tui/exportsummary/`：ExportSummary model/view、复用 export.LoadInput/ExportFinal、依赖注入（Export/DocxExporter/Now）、错误处理（CodeNoAcceptedChapters/CodeUnconfirmedReference/CodeDocxFailed）已稳定
 - `internal/tui/done/`：Done 完成页 model、Result 注入、输出目录/文件列表/命令提示已稳定
+- `internal/e2e/tui_flow_test.go`：TUI mock 全流程状态契约、SearchProgress→References RootModel 转场、ConfigWizard runtime role 解析、文档一致性验收已稳定
+- `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；Windows 桌面双击和真实 provider smoke 的待确认/跳过边界已如实记录
 
 ## 分支策略
 

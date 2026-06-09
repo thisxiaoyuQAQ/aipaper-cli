@@ -130,3 +130,6 @@ type RuntimeDoneMsg struct {
 	Success bool
 	Error   error
 }
+
+// RuntimeStopRequestedMsg signals that the user requested a stop.
+type RuntimeStopRequestedMsg struct{}

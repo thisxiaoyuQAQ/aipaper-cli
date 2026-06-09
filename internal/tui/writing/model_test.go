@@ -289,8 +289,15 @@ func TestUpdateKey_CtrlC_WhileRunning(t *testing.T) {
 
 	m = m.UpdateKey("ctrl+c")
 
-	if !m.canceled {
-		t.Error("expected canceled to be true")
+	// After Ctrl+C, should be stopping (not immediately canceled)
+	if !m.stopRequested {
+		t.Error("expected stopRequested to be true")
+	}
+	if !m.stopping {
+		t.Error("expected stopping to be true")
+	}
+	if m.canceled {
+		t.Error("expected canceled to be false until checkpoint saved")
 	}
 	if len(m.logs) == 0 {
 		t.Error("expected stop request log entry")

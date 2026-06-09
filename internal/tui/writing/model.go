@@ -45,10 +45,12 @@ type Model struct {
 	height int
 
 	// Runtime state
-	running  bool
-	done     bool
-	err      error
-	canceled bool
+	running       bool
+	done          bool
+	err           error
+	canceled      bool
+	stopping      bool
+	stopRequested bool
 }
 
 type logEntry struct {
@@ -105,6 +107,8 @@ func NewModel(opts Options) Model {
 		done:            false,
 		err:             nil,
 		canceled:        false,
+		stopping:        false,
+		stopRequested:   false,
 	}
 }
 
@@ -155,14 +159,21 @@ func (m Model) UpdateKey(key string) Model {
 func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "ctrl+c":
-		if m.running {
+		if m.running && !m.stopping {
 			// Request graceful stop
-			m.canceled = true
-			m.addLog(time.Now(), "system", "Stop requested, waiting for safe point...", false)
+			m.stopping = true
+			m.stopRequested = true
+			m.addLog(time.Now(), "system", "Stop requested, waiting for safe checkpoint...", false)
 			// In real implementation, send stop signal to runtime
-			return m, nil
+			// Return a command that will trigger runtime stop
+			return m, func() tea.Msg {
+				return RuntimeStopRequestedMsg{}
+			}
 		}
-		return m, tea.Quit
+		if !m.running {
+			return m, tea.Quit
+		}
+		return m, nil
 
 	case "q":
 		if !m.running {
@@ -226,6 +237,12 @@ func (m *Model) handleRuntimeEvent(ev RuntimeEvent) {
 
 	case EventCheckpointSaved:
 		m.addLog(ev.At, "system", "Checkpoint saved", false)
+		// If stop was requested and checkpoint is saved, mark as canceled
+		if m.stopRequested && m.stopping {
+			m.running = false
+			m.canceled = true
+			m.addLog(ev.At, "system", "Progress saved. You can continue next time.", false)
+		}
 
 	case EventExportArtifact:
 		m.addLog(ev.At, "export", ev.Message, false)
@@ -376,6 +393,16 @@ func (m Model) Err() error {
 // Canceled returns true if user requested stop.
 func (m Model) Canceled() bool {
 	return m.canceled
+}
+
+// Stopping returns true if stop is in progress.
+func (m Model) Stopping() bool {
+	return m.stopping
+}
+
+// StopRequested returns true if user requested stop.
+func (m Model) StopRequested() bool {
+	return m.stopRequested
 }
 
 // Helper functions

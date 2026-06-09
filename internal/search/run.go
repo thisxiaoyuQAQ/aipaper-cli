@@ -2,7 +2,6 @@ package search
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -83,18 +82,11 @@ func Run(ctx context.Context, s store.Store, opts Options) (Result, error) {
 }
 
 func writeResult(s store.Store, result Result) (Result, error) {
-	jsonPath := s.Path("references", "candidates.json")
-	mdPath := s.Path("references", "candidates.md")
-	if res, err := store.WriteJSON(jsonPath, result.Candidates, store.Overwrite); err != nil {
+	outputs, err := references.WriteCandidates(s, result.Candidates.Items)
+	if err != nil {
 		return result, err
-	} else {
-		result.Outputs = append(result.Outputs, res.Path)
 	}
-	if res, err := store.WriteFile(mdPath, []byte(formatCandidatesMarkdown(result.Candidates.Items)), store.Overwrite); err != nil {
-		return result, err
-	} else {
-		result.Outputs = append(result.Outputs, res.Path)
-	}
+	result.Outputs = outputs
 	return result, nil
 }
 
@@ -119,44 +111,6 @@ func filterProviders(providers []Provider, names []string) []Provider {
 		}
 	}
 	return filtered
-}
-
-func formatCandidatesMarkdown(candidates []contracts.ReferenceCandidate) string {
-	var b strings.Builder
-	b.WriteString("# Reference Candidates\n\n")
-	if len(candidates) == 0 {
-		b.WriteString("No reference candidates.\n")
-		return b.String()
-	}
-	for _, candidate := range candidates {
-		fmt.Fprintf(&b, "## %s\n\n", candidate.ID)
-		fmt.Fprintf(&b, "- Title: %s\n", candidate.Title)
-		fmt.Fprintf(&b, "- Authors: %s\n", strings.Join(candidate.Authors, ", "))
-		if candidate.Year != 0 {
-			fmt.Fprintf(&b, "- Year: %d\n", candidate.Year)
-		}
-		fmt.Fprintf(&b, "- Source: %s\n", candidate.Source)
-		if candidate.DOI != "" {
-			fmt.Fprintf(&b, "- DOI: %s\n", candidate.DOI)
-		}
-		if candidate.URL != "" {
-			fmt.Fprintf(&b, "- URL: %s\n", candidate.URL)
-		}
-		if candidate.Venue != "" {
-			fmt.Fprintf(&b, "- Venue: %s\n", candidate.Venue)
-		}
-		if candidate.CitationCount != 0 {
-			fmt.Fprintf(&b, "- Citation count: %d\n", candidate.CitationCount)
-		}
-		if candidate.DedupeGroup != "" {
-			fmt.Fprintf(&b, "- Dedupe group: %s\n", candidate.DedupeGroup)
-		}
-		if candidate.Abstract != "" {
-			fmt.Fprintf(&b, "\n%s\n", candidate.Abstract)
-		}
-		b.WriteString("\n")
-	}
-	return b.String()
 }
 
 func CandidateJSONPath(s store.Store) string {

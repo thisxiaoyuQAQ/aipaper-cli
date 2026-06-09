@@ -62,6 +62,10 @@ type RootModel struct {
 	Probe         ProbeResult
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
+	// Exit confirmation state
+	exitConfirm      bool
+	exitConfirmScreen Screen
+
 	err error
 }
 
@@ -210,6 +214,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.CurrentScreen = msg.Next
 		m.ScreenData = msg.Data
 		m.err = nil
+		m.exitConfirm = false
 		if msg.Next == ScreenConfigWizard {
 			m.ConfigWizard = configwizard.NewModel(configwizard.Options{WorkDir: m.WorkDir})
 		}
@@ -250,7 +255,29 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = m.Search.Err()
 			return m, nil
 		}
+	case writingtui.RuntimeStopRequestedMsg:
+		// Forward stop request to writing model if in writing screen
+		if m.CurrentScreen == ScreenWriting {
+			updated, _ := m.Writing.Update(msg)
+			if writingModel, ok := updated.(writingtui.Model); ok {
+				m.Writing = writingModel
+			}
+			return m, nil
+		}
 	case tea.KeyMsg:
+		// Handle exit confirmation first
+		if m.exitConfirm {
+			key := strings.ToLower(strings.TrimSpace(msg.String()))
+			switch key {
+			case "y":
+				return m, tea.Quit
+			case "n", "esc":
+				m.exitConfirm = false
+				return m, nil
+			}
+			return m, nil
+		}
+
 		if m.CurrentScreen == ScreenConfigWizard {
 			m.ConfigWizard = m.ConfigWizard.UpdateKey(msg.String())
 			if m.ConfigWizard.Done() {
@@ -308,8 +335,22 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentScreen == ScreenWriting {
 			return m.updateWriting(msg.String())
 		}
+		// Global Ctrl+C handling with confirmation for certain screens
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
+			// Screens that need exit confirmation
+			if m.shouldConfirmExit() {
+				m.exitConfirm = true
+				m.exitConfirmScreen = m.CurrentScreen
+				return m, nil
+			}
+			return m, tea.Quit
+		case "q":
+			if m.shouldConfirmExit() {
+				m.exitConfirm = true
+				m.exitConfirmScreen = m.CurrentScreen
+				return m, nil
+			}
 			return m, tea.Quit
 		}
 	}
@@ -317,6 +358,12 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m RootModel) View() string {
+	// Show exit confirmation if active
+	if m.exitConfirm {
+		view := m.currentScreenView()
+		return view + "\n\n⚠ Exit? Unsaved changes may be lost. [Y] Yes  [N] No\n"
+	}
+
 	if m.CurrentScreen == ScreenConfigWizard {
 		return m.ConfigWizard.View()
 	}
@@ -660,4 +707,58 @@ func (m RootModel) updateWriting(key string) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// shouldConfirmExit returns true if current screen should show exit confirmation.
+func (m RootModel) shouldConfirmExit() bool {
+	switch m.CurrentScreen {
+	case ScreenRequirements:
+		// For now, always allow quick exit from requirements
+		// In future, could check if form has unsaved changes
+		return false
+	case ScreenConfigWizard:
+		// Config wizard handles its own cancellation
+		return false
+	case ScreenWriting:
+		// Writing screen handles its own Ctrl+C for graceful stop
+		return false
+	case ScreenRecoverPrompt:
+		// Recovery prompt handles its own exit
+		return false
+	case ScreenMaterialsScan, ScreenSearchProgress:
+		// Background tasks - allow quick exit
+		return false
+	case ScreenReferences:
+		// For now, allow quick exit from references
+		// In future, could check if user has made selections
+		return false
+	default:
+		return false
+	}
+}
+
+// currentScreenView returns the view for the current screen without exit confirmation.
+func (m RootModel) currentScreenView() string {
+	if m.CurrentScreen == ScreenConfigWizard {
+		return m.ConfigWizard.View()
+	}
+	if m.CurrentScreen == ScreenRecoverPrompt {
+		return m.RecoverPrompt.View()
+	}
+	if m.CurrentScreen == ScreenRequirements {
+		return m.Requirements.View()
+	}
+	if m.CurrentScreen == ScreenMaterialsScan {
+		return m.Materials.View()
+	}
+	if m.CurrentScreen == ScreenSearchProgress {
+		return m.Search.View()
+	}
+	if m.CurrentScreen == ScreenReferences {
+		return m.References.View()
+	}
+	if m.CurrentScreen == ScreenWriting {
+		return m.Writing.View()
+	}
+	return fmt.Sprintf("aipaper-cli\n\n%s\n", m.CurrentScreen)
 }

@@ -1,0 +1,28 @@
+## 交接单
+- 来源角色：编写 Agent
+- 目标角色：审查 Agent
+- 所属任务：vault/16-References屏幕桥接与确认落盘.md
+- 涉及文件：
+  - internal/tui/app/root.go（修改，+64 行）
+  - internal/tui/app/references_bridge_test.go（新增，360 行）
+- 变更摘要：
+  - 在 RootModel 中添加 References 字段和桥接逻辑
+  - 实现 newReferencesModel 从 store 加载候选文献
+  - 实现 updateReferences 处理用户交互和确认提交
+  - 调用 references.LoadCandidates 和 ConfirmCandidates
+  - 未确认任何文献时阻塞进入 WritingProgress（返回 REFERENCE_NONE_CONFIRMED 错误）
+  - 确认成功后转场到 ScreenWriting
+  - 新增 9 个测试用例，覆盖确认、阻塞、取消、空候选等路径
+- 下游 Agent 需额外读取：
+  - 项目备忘录.skill（必读）
+  - docs/interfaces/tui.md（TUI 接口定义）
+  - internal/tui/references/model.go（references model 实现）
+  - internal/references/confirm.go（确认入口实现）
+  - vault/16-References屏幕桥接与确认落盘.md（本模块任务定义）
+- 已知风险/待确认项：
+  - 当前取消（Canceled）直接退出，未实现返回 SearchProgress 或 MaterialsScan 路径（vault 文件提及的可选路径）
+  - 空候选时的路径处理待审查确认
+  - 时间戳使用 time.Now().UTC()，需确认与项目约定一致
+- 测试结果：
+  - ✅ 所有测试通过（38 个测试，包括 9 个新增测试）
+  - ✅ 编译成功，无编译错误

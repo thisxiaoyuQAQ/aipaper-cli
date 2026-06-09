@@ -68,6 +68,8 @@
 - `internal/export/`：最终 Markdown、Docx、references、citation trace、report 导出接口已稳定；ExportSummary 必须复用 `LoadInput` / `ExportFinal`
 - `internal/tui/requirements/`：需求表单 model/view/update 与校验已稳定，后续只桥接，不重写
 - `internal/tui/references/`：文献确认 model/view/update、搜索/排序/拒绝/确认已稳定，后续只桥接，不重写
+- `internal/references/confirm.go`：LoadCandidates、ConfirmCandidates、confirmed/rejected/BibTeX 写入已稳定
+- `internal/tui/app/root.go` 中 References 桥接（newReferencesModel、updateReferences）已稳定
 
 ## 分支策略
 

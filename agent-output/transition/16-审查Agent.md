@@ -1,0 +1,32 @@
+## 交接单
+- 来源角色：审查 Agent
+- 目标角色：测试 Agent
+- 所属任务：vault/16-References屏幕桥接与确认落盘.md
+- 涉及文件：
+  - internal/tui/app/root.go（修改）
+  - internal/tui/app/references_bridge_test.go（新增）
+- 审查结论：✅ 审查通过
+- 审查摘要：
+  - 安全性：✅ 输入校验、错误处理到位，无敏感数据问题
+  - 并发与数据一致性：✅ 单线程 TUI，原子写入策略
+  - 资源管理：✅ 无资源泄漏风险
+  - 性能：✅ 符合 TUI 场景，无性能问题
+  - 错误处理：✅ 所有外部调用有错误捕获，使用项目约定错误码
+  - 项目约定一致性：✅ 时间格式、路径格式、命名规范全部符合
+  - 代码质量：✅ 文件行数合理，接口一致，边界条件完整
+  - TUI 特定检查：✅ 正确复用既有 model，转场消息正确
+  - 测试覆盖：✅ 9 个新增测试覆盖正常/异常/边界路径，全部通过
+- 发现的问题：
+  - 🔵建议：取消路径简化为统一退出（非阻塞，符合最简化原则）
+  - 🔵建议：ScreenData 类型差异需下游模块（WritingProgress）处理（非当前模块责任）
+- 下游 Agent 需额外读取：
+  - 项目备忘录.skill（必读）
+  - vault/16-References屏幕桥接与确认落盘.md（测试要求）
+  - internal/tui/app/references_bridge_test.go（已有测试）
+  - docs/interfaces/references.md（引用接口定义）
+- 测试重点：
+  - 确认写入 confirmed.json、rejected.json、confirmed.bib 三个文件
+  - 未确认任何文献时返回 REFERENCE_NONE_CONFIRMED 并阻塞 WritingProgress
+  - key 冲突处理保持稳定
+  - 空候选路径可返回前一步或退出
+  - 现有 references model 测试不回退

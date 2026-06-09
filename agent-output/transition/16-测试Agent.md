@@ -1,0 +1,40 @@
+## 交接单
+- 来源角色：测试 Agent
+- 目标角色：主 Agent
+- 所属任务：vault/16-References屏幕桥接与确认落盘.md
+- 涉及文件：
+  - internal/tui/app/root.go（修改）
+  - internal/tui/app/references_bridge_test.go（新增）
+- 测试结论：✅ 全部通过
+- 测试摘要：
+  - 总用例数：53（app 包 37 + references 包 12 + references TUI 包 4）
+  - 通过：53
+  - 失败：0
+  - 跳过：0
+- 新增测试：9 个
+  - TestRootModelReferencesConfirmTransitionsToWriting：正常确认并转场
+  - TestRootModelReferencesNoneConfirmedBlocksWriting：未确认阻塞
+  - TestRootModelReferencesCancelQuits：取消退出
+  - TestRootModelReferencesLoadCandidatesOnInit：初始化加载
+  - TestRootModelReferencesHandlesMissingCandidatesFile：缺失文件处理
+  - TestNewReferencesModelLoadsFromStore：newReferencesModel 函数
+  - TestUpdateReferencesConfirmCallsConfirmCandidates：updateReferences 确认调用
+  - TestUpdateReferencesPreservesErrorFromModel：错误保留
+  - TestReferencesDecisionUsesCurrentTime：时间戳 UTC
+- 覆盖率检查：
+  - ✅ 正常路径：确认文献并转场到 WritingProgress
+  - ✅ 异常路径：未确认文献时阻塞（REFERENCE_NONE_CONFIRMED）
+  - ✅ 边界条件：空候选、取消操作
+  - ✅ 文件写入：confirmed.json、rejected.json、confirmed.bib 三个文件
+  - ✅ 既有测试未回退：app 28 个、references TUI 4 个、references 12 个
+- 代码覆盖率：
+  - newReferencesModel: 100.0%
+  - updateReferences: 69.2%
+  - 整体 app 包: 62.4%
+- 关键验证点：
+  - ✅ LoadCandidates 加载候选文献
+  - ✅ ConfirmCandidates 写入三个文件
+  - ✅ 时间戳使用 time.Now().UTC()
+  - ✅ REFERENCE_NONE_CONFIRMED 错误正确阻塞
+  - ✅ Key 冲突处理保持稳定
+- 下一步：更新开发进度，提交代码

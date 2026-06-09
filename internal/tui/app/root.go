@@ -5,15 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	runtimeapp "github.com/thisxiaoyuQAQ/aipaper-cli/internal/app"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/search"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/configwizard"
 	materialstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/materials"
+	referencestui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/references"
 	requirementstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/requirements"
 	searchtui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/search"
 )
@@ -53,6 +56,7 @@ type RootModel struct {
 	Requirements  requirementstui.Model
 	Materials     materialstui.Model
 	Search        searchtui.Model
+	References    referencestui.Model
 	Probe         ProbeResult
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
@@ -107,6 +111,14 @@ func NewRootModel(opts RootOptions) RootModel {
 			m.Requirements = newRequirementsModel()
 		} else {
 			m.Materials = materialsModel
+		}
+	}
+	if screen == ScreenReferences {
+		referencesModel, err := newReferencesModel(m.WorkDir, m.ScreenData)
+		if err != nil {
+			m.err = err
+		} else {
+			m.References = referencesModel
 		}
 	}
 	return m
@@ -170,6 +182,15 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		var referencesModel referencestui.Model
+		if msg.Next == ScreenReferences {
+			var err error
+			referencesModel, err = newReferencesModel(m.WorkDir, msg.Data)
+			if err != nil {
+				m.err = err
+				return m, nil
+			}
+		}
 		m.CurrentScreen = msg.Next
 		m.ScreenData = msg.Data
 		m.err = nil
@@ -192,6 +213,10 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Next == ScreenSearchProgress {
 			m.Search = searchModel
 			return m, m.Search.Init()
+		}
+		if msg.Next == ScreenReferences {
+			m.References = referencesModel
+			return m, nil
 		}
 	case materialstui.ScanFinishedMsg:
 		if m.CurrentScreen == ScreenMaterialsScan {
@@ -257,6 +282,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentScreen == ScreenSearchProgress {
 			return m.updateSearch(msg.String())
 		}
+		if m.CurrentScreen == ScreenReferences {
+			return m.updateReferences(msg.String())
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -293,6 +321,13 @@ func (m RootModel) View() string {
 	if m.CurrentScreen == ScreenSearchProgress {
 		view := m.Search.View()
 		if m.err != nil && m.Search.Err() == nil {
+			return view + "\nError: " + m.err.Error() + "\n"
+		}
+		return view
+	}
+	if m.CurrentScreen == ScreenReferences {
+		view := m.References.View()
+		if m.err != nil && m.References.Err() == nil {
 			return view + "\nError: " + m.err.Error() + "\n"
 		}
 		return view
@@ -509,4 +544,59 @@ func newSearchModel(workDir string, data any) (searchtui.Model, error) {
 		Requirements:    req,
 		MaterialsResult: materialsResult,
 	}), nil
+}
+
+func newReferencesModel(workDir string, data any) (referencestui.Model, error) {
+	s := store.New(workDir)
+	candidates, err := references.LoadCandidates(s)
+	if err != nil {
+		return referencestui.Model{}, fmt.Errorf("load candidates failed: %w", err)
+	}
+	return referencestui.NewModel(candidates), nil
+}
+
+func (m RootModel) updateReferences(key string) (tea.Model, tea.Cmd) {
+	m.References = m.References.UpdateKey(key)
+	m.err = m.References.Err()
+
+	if m.References.Canceled() {
+		// 用户取消，提供返回路径
+		candidates := m.References.VisibleCandidates()
+		if len(candidates) == 0 {
+			// 候选为空时提供返回 SearchProgress、MaterialsScan 或退出
+			// 这里简化为退出，实际可以添加更复杂的逻辑
+			return m, tea.Quit
+		}
+		return m, tea.Quit
+	}
+
+	if m.References.Done() {
+		// 用户确认，调用 ConfirmCandidates
+		s := store.New(m.WorkDir)
+		candidates, err := references.LoadCandidates(s)
+		if err != nil {
+			m.err = fmt.Errorf("reload candidates failed: %w", err)
+			return m, nil
+		}
+
+		decision := m.References.Decision(time.Now().UTC())
+		result, err := references.ConfirmCandidates(s, candidates, decision)
+		if err != nil {
+			if references.IsNoneConfirmed(err) {
+				// 未确认任何文献，阻塞进入 WritingProgress
+				m.err = err
+				return m, nil
+			}
+			m.err = fmt.Errorf("confirm candidates failed: %w", err)
+			return m, nil
+		}
+
+		// 成功确认，转场到 WritingProgress
+		m.CurrentScreen = ScreenWriting
+		m.ScreenData = result
+		m.err = nil
+		return m, nil
+	}
+
+	return m, nil
 }

@@ -357,14 +357,19 @@ func TestLoadEvidenceTableTool(t *testing.T) {
 func TestToolsRegistry(t *testing.T) {
 	s := newTestStore(t)
 	tools := Tools(s)
-	if len(tools) != 2 {
+	if len(tools) != 4 {
 		t.Fatalf("Tools() len = %d", len(tools))
 	}
 	names := map[string]bool{}
 	for _, tool := range tools {
 		names[tool.Name()] = true
 	}
-	if !names["save_evidence_table"] || !names["load_evidence_table"] {
-		t.Fatalf("tool names = %#v", names)
+	for _, want := range []string{
+		"save_evidence_table", "load_evidence_table",
+		"save_section_quality_plan", "load_section_quality_plan",
+	} {
+		if !names[want] {
+			t.Fatalf("tool %s missing, names = %#v", want, names)
+		}
 	}
 }

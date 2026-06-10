@@ -43,6 +43,8 @@ func Tools(s store.Store) []agentcore.Tool {
 	return []agentcore.Tool{
 		NewSaveEvidenceTableTool(s),
 		NewLoadEvidenceTableTool(s),
+		NewSaveSectionQualityPlanTool(s),
+		NewLoadSectionQualityPlanTool(s),
 	}
 }
 

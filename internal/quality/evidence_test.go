@@ -357,7 +357,7 @@ func TestLoadEvidenceTableTool(t *testing.T) {
 func TestToolsRegistry(t *testing.T) {
 	s := newTestStore(t)
 	tools := Tools(s)
-	if len(tools) != 7 {
+	if len(tools) != 9 {
 		t.Fatalf("Tools() len = %d", len(tools))
 	}
 	names := map[string]bool{}
@@ -368,6 +368,7 @@ func TestToolsRegistry(t *testing.T) {
 		"save_evidence_table", "load_evidence_table",
 		"save_section_quality_plan", "load_section_quality_plan",
 		"save_claim_graph", "load_claim_graph", "extract_chapter_claims",
+		"save_verification_result", "quality_gate_check",
 	} {
 		if !names[want] {
 			t.Fatalf("tool %s missing, names = %#v", want, names)

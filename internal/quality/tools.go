@@ -48,6 +48,8 @@ func Tools(s store.Store) []agentcore.Tool {
 		NewSaveClaimGraphTool(s),
 		NewLoadClaimGraphTool(s),
 		NewExtractChapterClaimsTool(s),
+		NewSaveVerificationResultTool(s),
+		NewQualityGateCheckTool(s),
 	}
 }
 

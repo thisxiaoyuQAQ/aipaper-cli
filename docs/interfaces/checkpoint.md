@@ -116,9 +116,9 @@ type RecoveryResult struct {
 
 每个可恢复动作即一个 step：
 
-`collect_requirements` → `parse_materials` → `search_references` → `confirm_references` → `create_outline` → `draft_chapter` → `review_chapter` → `revise_chapter` → `commit_chapter` → `final_review` → `export_docx`
+`collect_requirements` → `parse_materials` → `search_references` → `confirm_references` → `evidence_extraction` → `create_outline` → `section_quality_plan` → `draft_chapter` → `review_chapter` → `revise_chapter` → `commit_chapter` → `final_review` → `export_docx`
 
-（章节循环中 `draft_chapter`/`review_chapter`/`revise_chapter`/`commit_chapter` 按章节与版本重复出现。）
+（章节循环中 `draft_chapter`/`review_chapter`/`revise_chapter`/`commit_chapter` 按章节与版本重复出现。质量步骤 `evidence_extraction`、`section_quality_plan` 为模块 24 新增，常量见 `internal/agent/quality.go`，走同一 checkpoint 机制。）
 
 ## 7. 崩溃一致性写入顺序（spec 第 5 节）
 

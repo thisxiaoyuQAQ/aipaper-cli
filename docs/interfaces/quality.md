@@ -1,6 +1,6 @@
 # Quality Engine 质量产物契约
 
-> 状态：模块 23（EvidenceTable）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/tools.go`；模块 24-31 仍为规划产物。
+> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`；模块 25-31 仍为规划产物。
 > 设计依据：`docs/superpowers/specs/2026-06-10-quality-engine-design.md` 第 3、4、5 节。
 
 ## 1. 存储路径
@@ -59,7 +59,9 @@ type Evidence struct {
 | `snippet`/`fulltext_excerpt` 必须有 `material_id` 且 `materials/extracted/<material_id>.md` 非空存在 | `evidence_depth_unsupported` |
 | 读写失败、JSON 不合法、文件缺失 | `evidence_io_failed` |
 
-## 3. SectionQualityPlan / SectionPlan（模块 24）
+## 3. SectionQualityPlan / SectionPlan（模块 24，已实现）
+
+> 代码：`internal/quality/sectionplan.go`
 
 ```go
 type SectionQualityPlan struct {
@@ -78,6 +80,25 @@ type SectionPlan struct {
     HumanReviewHints         []string `json:"human_review_hints,omitempty"`
 }
 ```
+
+公开 API：
+
+- `SaveSectionQualityPlan(s, plan) ([]string, error)`：先校验后写入 `quality/section-quality-plan.json` + `.md`（原子写入），返回相对路径列表；
+- `LoadSectionQualityPlan(s) (SectionQualityPlan, error)`：严格 JSON 读取（DisallowUnknownFields）；
+- `ValidateSectionQualityPlan(s, plan) error`：单独校验；
+- `FormatSectionQualityPlanMarkdown(plan) string`：Markdown 渲染。
+
+校验规则与错误码（结构化错误 `quality.Error{code,message,retryable,details}`）：
+
+| 规则 | 错误码 |
+| --- | --- |
+| `generated_at` 必填；`chapter_id` 非空 | `section_plan_invalid` |
+| 同一 chapter_id 重复出现 | `section_plan_duplicate_chapter` |
+| `chapter_id` 不在 `outline/outline.json` 章节列表（outline 缺失视为零章节） | `section_plan_unknown_chapter` |
+| `required_evidence_ids` 含 Evidence Table 中不存在的 id（evidence table 缺失视为零证据） | `section_plan_unknown_evidence` |
+| 读写失败、JSON 不合法、outline 解析失败 | `section_plan_io_failed` |
+
+新增 Coordinator 步骤（`internal/agent/quality.go`，常量 `StepEvidenceExtraction` / `StepSectionQualityPlan`）：`evidence_extraction`（confirm_references 后）与 `section_quality_plan`（create_outline 同期/后），均走现有 checkpoint 机制；Architect 通过 Coordinator 提示词扩展承担 evidence 提炼与每章质量计划职责，规划规则不硬编码进 Host。
 
 ## 4. ClaimGraph / ClaimNode（模块 26、27）
 
@@ -137,11 +158,11 @@ type ClaimNode struct {
 | 工具 | 状态 | 校验 |
 | --- | --- | --- |
 | `save_evidence_table` / `load_evidence_table` | ✅ 已实现（`internal/quality/tools.go`，`quality.Tools(s)` 返回） | schema + reference_key 必须 confirmed + depth 渐进规则；save 入参 `{"table": EvidenceTable}`，严格解析未知字段拒绝 |
-| `save_section_quality_plan` / `load_section_quality_plan` | 规划（模块 24） | evidence ID 存在于 Evidence Table + chapter_id 与 outline 一致 |
+| `save_section_quality_plan` / `load_section_quality_plan` | ✅ 已实现（`internal/quality/sectionplan_tools.go`，`quality.Tools(s)` 返回） | evidence ID 存在于 Evidence Table + chapter_id 与 outline 一致；save 入参 `{"plan": SectionQualityPlan}`，严格解析未知字段拒绝 |
 | `save_claim_graph` | 规划（模块 26） | reference_keys / evidence_ids / chapter_id 全部机器校验 |
 | `save_verification_result` | 规划（模块 27） | 支撑关系与风险等级写入，Host 据此算门控 |
 | `quality_gate_check` | 规划（模块 27） | 纯 Host 逻辑，接收 mode 参数 |
 
-工具失败统一返回 `{ok:false,error:{code,message,retryable,details}}`，不抛自然语言。工具注册进 agent runtime 的接线由模块 24 在 `internal/agent` 边界上完成。
+工具失败统一返回 `{ok:false,error:{code,message,retryable,details}}`，不抛自然语言。工具注册已接线：`internal/agent.DefaultTools` 追加 `quality.Tools(s)`，agent runtime 自动获得全部 quality 工具（模块 24 完成）。
 
 边界原则：「引用存在、claim 有 evidence、evidence 来自 confirmed」由 Host 机器校验；「证据是否真的支撑论断」由 Editor/verifier 语义判断，Host 只记录与执行结果。

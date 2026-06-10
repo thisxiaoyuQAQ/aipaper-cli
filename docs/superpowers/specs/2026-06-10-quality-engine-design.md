@@ -191,7 +191,7 @@ step: claim_verification       （claim 抽取后、Editor 评审前）
 
 | 模式 | 行为 |
 |---|---|
-| fast 快速初稿 | 跳过 claim verification 语义判断；保留 Host 硬校验（引用必须 confirmed、不得伪造 key）；质量产物降级为 warnings-only |
+| fast 快速初稿 | 跳过 claim verification 的 verifier 语义判断（Claim Graph 仍抽取、Host 机器校验仍执行，verification 支撑关系字段标记为 `skipped`）；保留 Host 硬校验（引用必须 confirmed、不得伪造 key）；分级风险降级为 warnings-only |
 | enhanced 质量增强（默认） | 完整闭环：evidence → plan → claim → verification → rewrite；硬门槛阻断底线问题，弱证据进入分级风险 |
 | strict 严格证据 | 在 enhanced 基础上收紧：abstract 级证据支撑强结论从 warning 升级为 `needs_revision`；`metadata_only` 证据不允许作为关键论断唯一支撑；`partially_supported` 也触发重写；重写超限一律 `needs_human_review` 并在 report 置顶 |
 

@@ -12,7 +12,8 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 3.2、4.1、4.2 节）
 - `internal/quality/`（模块 23 产出）
 - `internal/agent/`（Coordinator prompt、step runner、事实工具——勿动文件，只在边界上新增）
@@ -59,3 +60,7 @@
 ## 已知风险/边界
 
 - `internal/agent/` 为勿动目录，只在其边界新增 step 与工具注册，不改既有决策语义。
+
+## 行数预估
+
+- `internal/quality/sectionplan.go` ≈ 200 行 + 测试 ≈ 250 行；agent 边界新增 step 注册 ≈ 150 行；单文件 < 500 行。

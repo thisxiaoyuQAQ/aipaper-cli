@@ -10,7 +10,8 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 4.2 节）
 - `internal/artifacts/`（review.json 既有结构）
 - `internal/agent/`（Editor prompt）
@@ -54,3 +55,7 @@
 ## 已知风险/边界
 
 - 不改变重写上限 2 轮的既有规则。
+
+## 行数预估
+
+- review 扩展与校验 ≈ 150 行 + 测试 ≈ 200 行；Editor prompt 扩展 ≈ 80 行；单文件 < 500 行。

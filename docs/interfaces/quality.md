@@ -1,0 +1,130 @@
+# Quality Engine 质量产物契约（规划中）
+
+> 状态：模块 23-31 规划产物，实现后以 `internal/quality` 代码为权威来源并更新本文件。
+> 设计依据：`docs/superpowers/specs/2026-06-10-quality-engine-design.md` 第 3、4、5 节。
+
+## 1. 存储路径
+
+| 产物 | 路径（相对 Store 根） |
+| --- | --- |
+| Evidence Table | `quality/evidence-table.json` + `quality/evidence-table.md` |
+| Section Quality Plan | `quality/section-quality-plan.json` + `.md` |
+| Claim Graph | `quality/claim-graph.json` + `.md` |
+| Verification Result | `quality/verification-result.json` |
+| Quality Report | `final/quality-report.md` |
+
+写入沿用项目约定：temp + fsync + rename 原子写入、严格 JSON 读取（DisallowUnknownFields）、RFC3339 UTC 时间、正斜杠相对路径。
+
+## 2. EvidenceTable / Evidence（模块 23）
+
+```go
+type EvidenceTable struct {
+    GeneratedAt time.Time  `json:"generated_at"`
+    Items       []Evidence `json:"items"`
+}
+
+type Evidence struct {
+    ID           string   `json:"id"`            // ev_001 风格
+    ReferenceKey string   `json:"reference_key"` // 必须存在于 references/confirmed.json
+    MaterialID   string   `json:"material_id,omitempty"` // 来自用户材料时关联 material_001
+    Depth        string   `json:"depth"`         // metadata_only|abstract|snippet|fulltext_excerpt
+    Topics       []string `json:"topics"`
+    KeyFindings  []string `json:"key_findings"`
+    Method       string   `json:"method,omitempty"`
+    Subjects     string   `json:"subjects,omitempty"`
+    Limitations  []string `json:"limitations,omitempty"`
+    Excerpt      string   `json:"excerpt,omitempty"` // snippet 级以上才有
+    Confidence   string   `json:"confidence"`    // high|medium|low
+    Coverage     string   `json:"coverage,omitempty"`
+    RiskFlags    []string `json:"risk_flags,omitempty"`
+}
+```
+
+校验规则：`reference_key` 不在 confirmed → `evidence_unconfirmed_reference`；无材料全文解析文本时不允许 `snippet` / `fulltext_excerpt` depth。
+
+## 3. SectionQualityPlan / SectionPlan（模块 24）
+
+```go
+type SectionQualityPlan struct {
+    GeneratedAt time.Time     `json:"generated_at"`
+    Sections    []SectionPlan `json:"sections"`
+}
+
+type SectionPlan struct {
+    ChapterID                string   `json:"chapter_id"` // 必须与 outline 章节一致
+    Questions                []string `json:"questions"`
+    RequiredEvidenceIDs      []string `json:"required_evidence_ids"` // 必须存在于 Evidence Table
+    RecommendedReferenceKeys []string `json:"recommended_reference_keys,omitempty"`
+    Boundaries               []string `json:"boundaries,omitempty"`
+    ForbiddenGeneralizations []string `json:"forbidden_generalizations,omitempty"`
+    Gaps                     []string `json:"gaps,omitempty"`
+    HumanReviewHints         []string `json:"human_review_hints,omitempty"`
+}
+```
+
+## 4. ClaimGraph / ClaimNode（模块 26、27）
+
+```go
+type ClaimGraph struct {
+    UpdatedAt time.Time   `json:"updated_at"`
+    Claims    []ClaimNode `json:"claims"` // 按章增量 merge，不整体覆盖
+}
+
+type ClaimNode struct {
+    ID               string   `json:"id"`         // claim_001 风格
+    Text             string   `json:"text"`
+    ChapterID        string   `json:"chapter_id"`
+    ReferenceKeys    []string `json:"reference_keys"` // 机器校验存在于 confirmed.json
+    EvidenceIDs      []string `json:"evidence_ids"`   // 机器校验存在于 Evidence Table
+    Support          string   `json:"support"`        // supported|partially_supported|unsupported|overstated|skipped(fast)
+    RiskLevel        string   `json:"risk_level"`     // high|medium|low
+    VerifierNote     string   `json:"verifier_note,omitempty"`
+    NeedsRewrite     bool     `json:"needs_rewrite"`
+    NeedsHumanReview bool     `json:"needs_human_review"`
+}
+```
+
+## 5. quality_gate_check（模块 27，纯 Host 逻辑）
+
+输入：Claim Graph + verification result + `quality_mode`。
+输出结论枚举：`pass` / `pass_with_warnings` / `needs_revision` / `needs_human_review` / `blocked`。
+
+硬阻断（所有模式）：引用 key 不在 confirmed、claim 无 evidence 绑定、evidence 指向不存在引用、伪造 key。
+
+| 风险情形 | fast | enhanced | strict |
+| --- | --- | --- | --- |
+| abstract 级证据支撑强结论 | warning | warning | needs_revision |
+| metadata_only 作关键论断唯一支撑 | warning | warning | needs_revision（不允许） |
+| unsupported claim | warning | needs_revision | needs_revision |
+| partially_supported | warning | warning | needs_revision（触发重写） |
+| 跨章重复论断 | warning | warning | warning |
+| 重写超 2 轮 | needs_human_review | needs_human_review | needs_human_review（report 置顶） |
+
+与 `internal/artifacts` 既有章节门控（总分 ≥80、引用一致性 ≥90）并联：任一 blocked 即阻断。阈值首版固定默认值，不暴露配置。
+
+## 6. 既有契约的规划扩展
+
+实现时在对应模块的边界上扩展，不重写既有规则：
+
+| 契约 | 扩展 | 模块 |
+| --- | --- | --- |
+| `Requirements`（requirements.md） | 新增 `quality_mode` 字段：`fast` / `enhanced`（默认）/ `strict`；旧文件缺字段时新 run 按 enhanced、恢复旧 run 走兼容模式 | 30 |
+| `Claim`（artifacts.md） | 新增 `evidence_ids []string`（必填 ≥1）；旧 claims.json 无该字段按兼容模式读取（warning 不阻断） | 25 |
+| `Review`（artifacts.md） | 新增 `rewrite_instructions` 数组：`claim_id?`、`location`、`problem`、`instruction`、`suggested_evidence_ids`、`severity(required/optional)`；向后兼容 | 28 |
+| Step 列表（checkpoint.md） | 新增 `evidence_extraction`（confirm_references 后）、`section_quality_plan`（create_outline 同期/后）、`claim_extraction`（每章 draft 后）、`claim_verification`（claim 抽取后、review 前），全部走现有 checkpoint 机制 | 24, 26, 27 |
+| `final/` 导出（export.md） | 新增 `final/quality-report.md`；`report.md` 增加质量摘要；质量报告生成失败不阻塞 paper.md/paper.docx | 29 |
+| TUI（tui.md） | Requirements 新增模式选择；WritingProgress 步骤区/章节状态（`verifying`/`needs_revision`）/日志区扩展；ExportSummary 质量结论行；StateProbe 探测 `quality/` 产物；RecoverPrompt 注明质量模式 | 30 |
+
+## 7. Host 工具（internal/quality）
+
+| 工具 | 校验 |
+| --- | --- |
+| `save_evidence_table` / `load_evidence_table` | schema + reference_key 必须 confirmed + depth 渐进规则 |
+| `save_section_quality_plan` / `load_section_quality_plan` | evidence ID 存在于 Evidence Table + chapter_id 与 outline 一致 |
+| `save_claim_graph` | reference_keys / evidence_ids / chapter_id 全部机器校验 |
+| `save_verification_result` | 支撑关系与风险等级写入，Host 据此算门控 |
+| `quality_gate_check` | 纯 Host 逻辑，接收 mode 参数 |
+
+工具失败统一返回 `{ok:false,error:{code,message,retryable,details}}`，不抛自然语言。
+
+边界原则：「引用存在、claim 有 evidence、evidence 来自 confirmed」由 Host 机器校验；「证据是否真的支撑论断」由 Editor/verifier 语义判断，Host 只记录与执行结果。

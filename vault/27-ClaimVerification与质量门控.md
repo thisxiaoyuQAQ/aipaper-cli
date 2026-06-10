@@ -10,7 +10,8 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 4.4、5 节）
 - `internal/quality/`、`internal/agent/`
 
@@ -55,3 +56,7 @@
 ## 已知风险/边界
 
 - verifier 语义判断主观性：靠结构化 verification result 与夹具验收约束，不在本模块解决全部边界。
+
+## 行数预估
+
+- `internal/quality/gate.go` ≈ 300 行（三档矩阵）+ 测试 ≈ 400 行；verification step 接入 ≈ 150 行；单文件 < 500 行。

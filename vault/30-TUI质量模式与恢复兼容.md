@@ -11,7 +11,8 @@ TUI 接入 Quality Engine：Requirements 模式选择、WritingProgress/ExportSu
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 5、6 节）
 - `docs/interfaces/tui.md`
 - `internal/tui/requirements/`（勿动，桥接扩展）
@@ -67,3 +68,7 @@ TUI 接入 Quality Engine：Requirements 模式选择、WritingProgress/ExportSu
 ## 已知风险/边界
 
 - 勿动文件只桥接不重写。
+
+## 行数预估
+
+- requirements 桥接 ≈ 100 行、writing/exportsummary/stateprobe/recoverprompt 各 ≈ 80-150 行 + 测试 ≈ 400 行；单文件 < 500 行。

@@ -10,7 +10,8 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 3.3、4.1 节）
 - `internal/quality/`
 - `internal/artifacts/`（claims.json、citation_map.json）
@@ -55,3 +56,7 @@
 ## 已知风险/边界
 
 - 重复检测首版用简单文本规整 + 相似度阈值，不引入向量库。
+
+## 行数预估
+
+- `internal/quality/claimgraph.go` ≈ 280 行（含按章 merge 与重复检测）+ 测试 ≈ 350 行；单文件 < 500 行。

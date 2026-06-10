@@ -12,7 +12,7 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 3.1、4.3 节）
 - `docs/interfaces/_index.md`
 - `internal/store/`、`internal/contracts/`
@@ -63,3 +63,7 @@
 
 - 不做 OCR/表格/公式级证据；
 - 不保证页码级定位，snippet 级即可。
+
+## 行数预估
+
+- `internal/quality/evidence.go` ≈ 250 行、`evidence_test.go` ≈ 300 行、工具注册 ≈ 100 行；单文件 < 500 行。

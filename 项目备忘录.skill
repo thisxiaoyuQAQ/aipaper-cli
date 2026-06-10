@@ -22,6 +22,8 @@
 - 错误处理：工具失败返回 `{ok:false,error:{code,message,retryable,details}}`
 - 引用硬规则：Writer 和 Editor 只能使用 `references/confirmed.json`
 - 质量门控：单章总分 >= 80，引用一致性 >= 90，无高风险 unsupported claim；最多重写 2 轮
+- 质量模式：`requirements.json.quality_mode = fast | enhanced(默认) | strict`，三档只改门控严格度，产物结构相同；硬阻断（伪造 key、claim 无 evidence、引用未 confirmed）所有模式生效
+- 质量产物：`quality/evidence-table.json`、`quality/section-quality-plan.json`、`quality/claim-graph.json`，契约见 `docs/interfaces/quality.md`
 - TUI 增量原则：TUI 编排屏幕，Host 执行运行时，Coordinator 决策写作流程，Store 是状态权威
 
 ## 模块依赖关系
@@ -42,21 +44,34 @@
                                      └─ 20-用户文档与README快速入口
                                           └─ 21-TUI全流程测试与Windows双击验收
                                                └─ 22-真实Runtime接入与本机验收
+
+23-EvidenceTable底座（依赖 01, 02, 04）
+  └─ 24-SectionQualityPlan写前约束（依赖 05, 06）
+       └─ 25-Writer证据使用协议
+            └─ 26-ClaimGraph写后抽取
+                 └─ 27-ClaimVerification与质量门控
+                      └─ 28-EditorRewriteInstructions
+                           └─ 29-QualityReport导出汇总（依赖 08）
+                                └─ 30-TUI质量模式与恢复兼容（依赖 10-22）
+                                     └─ 31-三层验收与质量夹具（依赖 09）
 ```
 
 ## 文档指针
 
 - 已批准 MVP 设计稿：`docs/superpowers/specs/2026-06-05-aipaper-cli-design.md`
 - TUI 全流程增量设计稿：`docs/superpowers/specs/2026-06-08-tui-full-generation-user-guide-design.md`
+- Quality Engine 设计稿：`docs/superpowers/specs/2026-06-10-quality-engine-design.md`
 - 合并需求与架构：`docs/需求与架构.md`
 - TUI 增量需求：`docs/TUI全流程增量需求.md`
 - TUI 增量架构：`docs/TUI全流程增量架构设计.md`
 - TUI 增量开发流程：`docs/TUI全流程详细开发流程.md`
 - 接口定义索引：`docs/interfaces/_index.md`
 - TUI 接口补充：`docs/interfaces/tui.md`
+- Quality 接口契约：`docs/interfaces/quality.md`
 - 开发进度：`docs/开发进度.md`
 - 修复记录：`docs/修复记录.md`（如不存在，首次修复时创建）
-- 当前开发任务：`vault/10-*.md` 至 `vault/22-*.md`
+- TUI 增量任务：`vault/10-*.md` 至 `vault/22-*.md`（已完成）
+- Quality Engine 任务：`vault/23-*.md` 至 `vault/31-*.md`（待开发）
 
 ## 勿动文件清单
 
@@ -73,11 +88,11 @@
 - `internal/tui/app/root.go` 中 References 桥接（newReferencesModel、updateReferences）已稳定
 - `internal/tui/writing/`：WritingProgress 四区布局、RuntimeEvent 桥接、model/view/events 已稳定；两阶段停止（stopping→checkpoint saved→canceled）已稳定；真实 runtime 接入在边界扩展，不修改核心逻辑
 - `internal/tui/app/recover_prompt.go`：RecoverPrompt 继续/重开/退出交互、重开二次确认已稳定
-- `internal/tui/app/root.go` 中退出确认（exitConfirm）和 RuntimeStopRequestedMsg 转发已稳定；真实 runtime stop 调用待真实 runtime 接入时补充
+- `internal/tui/app/root.go` 中退出确认（exitConfirm）和 RuntimeStopRequestedMsg 转发已稳定；真实 runtime stop adapter 已随模块 22 补齐
 - `internal/tui/exportsummary/`：ExportSummary model/view、复用 export.LoadInput/ExportFinal、依赖注入（Export/DocxExporter/Now）、错误处理（CodeNoAcceptedChapters/CodeUnconfirmedReference/CodeDocxFailed）已稳定
 - `internal/tui/done/`：Done 完成页 model、Result 注入、输出目录/文件列表/命令提示已稳定
 - `internal/e2e/tui_flow_test.go`：TUI mock 全流程状态契约、SearchProgress→References RootModel 转场、ConfigWizard runtime role 解析、文档一致性验收已稳定
-- `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；Windows 桌面双击和真实 provider smoke 的待确认/跳过边界已如实记录
+- `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；模块 22 已补齐真实 runtime 接入、stop adapter、真实 provider smoke 与 Windows 本机验收记录
 
 ## 分支策略
 
@@ -94,6 +109,7 @@
 ## Agent 调度要点
 
 - 每个开发任务开始前必须读取本文件、对应 vault、`docs/TUI全流程增量需求.md`、`docs/TUI全流程增量架构设计.md`、`docs/interfaces/tui.md`
+- Quality Engine 任务（23-31）额外先读 `docs/superpowers/specs/2026-06-10-quality-engine-design.md`、`docs/interfaces/quality.md`；勿动目录只做边界扩展，不重写既有规则
 - 调度顺序：编写 → 审查 → 测试 → 修复（最多 3 轮）→ 记录进度
 - 作者和审查必须分离；不要在同一主动上下文中自审通过
 - 代码实现优先复用 `internal/contracts`、`internal/store`、`internal/checkpoint`、`internal/config`

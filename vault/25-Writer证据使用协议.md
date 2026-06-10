@@ -11,7 +11,8 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 4.2、4.4 节）
 - `internal/artifacts/`（claims.json 既有结构——勿动目录，边界上扩展）
 - `internal/agent/`（Writer prompt 与 writer guard）
@@ -51,3 +52,7 @@
 
 - 不得为通过测试放宽「只能使用 confirmed references」硬规则；
 - `internal/artifacts/` 只在边界扩展字段与校验，不重写产物规则。
+
+## 行数预估
+
+- claims 字段扩展与 guard 校验 ≈ 120 行 + 测试 ≈ 200 行；prompt 扩展 ≈ 80 行；单文件 < 500 行。

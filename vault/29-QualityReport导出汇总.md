@@ -12,7 +12,8 @@
 
 ## 需要读取
 
-- `项目备忘录.md`
+- `项目备忘录.skill`
+- `docs/interfaces/quality.md`
 - `docs/superpowers/specs/2026-06-10-quality-engine-design.md`（第 3.4 节）
 - `internal/export/`（勿动目录，通过既有 LoadInput/ExportFinal 边界扩展）
 
@@ -55,3 +56,7 @@
 ## 已知风险/边界
 
 - `internal/export/` 勿动：通过 LoadInput/ExportFinal 既有接口边界扩展，不重写导出规则。
+
+## 行数预估
+
+- quality-report 渲染 ≈ 250 行 + 测试（含快照）≈ 300 行；export 边界接入 ≈ 100 行；单文件 < 500 行。

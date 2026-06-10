@@ -1,0 +1,47 @@
+## 交接单
+- 来源角色：主 Agent / 修复 Agent
+- 目标角色：审查 Agent / 测试 Agent
+- 所属任务：全量代码审计、vault 自我审查、无用文件清理
+- 涉及文件：
+  - `.gitignore`（新增，忽略本地生成物与 Claude worktree 状态）
+  - `internal/tui/app/root.go`（修复按键转场初始化与恢复转场）
+  - `internal/tui/app/root_test.go`（补 RootModel 转场回归测试）
+  - `internal/tui/app/state_probe.go`（修复恢复路由与配置校验复用 runtime 解析）
+  - `internal/tui/app/state_probe_test.go`（补 candidates 无材料时恢复到 References）
+  - `internal/tui/search/model.go`（禁用在线搜索时不调用 provider）
+  - `internal/tui/search/model_test.go`（补禁用搜索不触发 provider）
+  - `internal/e2e/tui_flow_test.go`（补测试 API key 环境，适配 runtime config 校验）
+  - `docs/修复记录.md`（新增修复记录）
+  - `agent-output/request/全量审计-决策请求.md`（记录需主 Agent/用户裁决的真实 runtime 与本机验收边界）
+- 变更摘要：
+  - 修复 MaterialsScan → SearchProgress 按键路径未初始化 Search model / 未启动搜索的问题。
+  - 修复 SearchProgress → References 按键路径未加载 References model 的问题。
+  - 修复 RecoverPrompt continue 后未创建 Writing model / 未返回 Init 命令的问题。
+  - 修复 `allow_online_search=false` 仍调用搜索 provider 的问题。
+  - 修复跳过材料但已有 candidates 后重启仍回到 MaterialsScan 的路由问题。
+  - 将 TUI 配置探测改为复用 `runtimeapp.ResolveRoleRuntime`，减少与真实 runtime 的校验漂移。
+  - 清理 `aipaper-cli.exe` 和 `coverage*.out` 生成文件；`.claude/worktrees/` 因存在脏 worktree 且删除被权限策略拒绝，已改为加入 `.gitignore`，待用户明确授权后再移除。
+- 下游 Agent 需额外读取：
+  - `项目备忘录.skill`
+  - `docs/开发进度.md`
+  - `docs/修复记录.md`
+  - `agent-output/request/全量审计-决策请求.md`
+  - `internal/tui/app/root.go`
+  - `internal/tui/app/state_probe.go`
+  - `internal/tui/search/model.go`
+- 已执行验证：
+  - `go test ./internal/tui/app ./internal/tui/search ./internal/e2e`：通过
+  - `go test ./...`：通过
+- 已知风险/待确认项：
+  - `.claude/worktrees/agent-a99cb8a85e9ee7b47` 和 `.claude/worktrees/agent-ac1dd1685e499915e` 是本轮/此前 agent 生成 worktree，其中至少一个存在未提交修改；自动删除被权限策略拒绝，需要用户明确确认后才能移除。
+  - vault 17/18 的真实 runtime 接入、真实 stop adapter，以及 vault 21 的 Windows 桌面双击/真实 provider smoke 仍需主 Agent/用户裁决是否拆为新任务。
+
+## 任务完成检查
+- [x] 交接单已输出（含涉及文件、变更摘要、下游需读取文件）
+- [x] 开发进度.md 状态已审查；真实 runtime / 本机验收边界已输出决策请求，未擅自回退状态
+- [x] 接口定义是否有变更 → 本轮代码修复未新增公开接口；此前 `docs/interfaces/tui.md` 已有 MaterialsScanResult 补充
+- [x] 项目备忘录勿动清单是否需要更新 → 本轮未新增稳定勿动文件
+- [x] 修复记录是否需要新增条目 → 已新增 `docs/修复记录.md`
+- [x] vault 文件中是否有需要修正的信息 → 已在决策请求中列出 17/18/21 边界，待裁决
+- [x] 代码中是否存在 TODO/FIXME → 本轮未新增 TODO/FIXME
+- [x] 集成测试是否受影响 → 已回跑 `internal/e2e` 与 `go test ./...`

@@ -1,0 +1,24 @@
+## 交接单
+- 来源角色：主 Agent
+- 目标角色：编写 Agent
+- 所属任务：vault/22-真实Runtime接入与本机验收.md
+- 涉及文件：
+  - vault/22-真实Runtime接入与本机验收.md（新增真实环境边界后续任务）
+  - docs/开发进度.md（新增模块 22 和验收总线条目）
+  - 项目备忘录.skill（更新模块依赖图与当前开发任务范围）
+  - .claude/worktrees/（已按用户授权删除残留 agent worktree）
+- 变更摘要：
+  - 按用户裁决将 17/18/21 中真实 runtime 接入、真实 runtime stop adapter、真实 provider smoke、Windows 本机双击验收拆为独立模块 22。
+  - 保留 17/18/21 自动化验收完成状态，不回退原模块。
+  - 删除 `.claude/worktrees/agent-a99cb8a85e9ee7b47` 与 `.claude/worktrees/agent-ac1dd1685e499915e`，并移除空的 `.claude/worktrees` 目录。
+- 下游 Agent 需额外读取：
+  - 项目备忘录.skill
+  - docs/开发进度.md
+  - docs/TUI全流程增量需求.md
+  - docs/TUI全流程增量架构设计.md
+  - docs/interfaces/tui.md
+  - agent-output/request/全量审计-决策请求.md
+  - vault/22-真实Runtime接入与本机验收.md
+- 已知风险/待确认项：
+  - 模块 22 涉及真实 provider 调用，执行 smoke 前必须确认 API key 和费用授权。
+  - Windows 双击验收可能需要用户本机手动确认。

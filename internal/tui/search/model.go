@@ -17,11 +17,11 @@ import (
 type Status string
 
 const (
-	StatusSearching  Status = "searching"
-	StatusComplete   Status = "complete"
-	StatusAllFailed  Status = "all_failed"
-	StatusDisabled   Status = "disabled"
-	StatusError      Status = "error"
+	StatusSearching Status = "searching"
+	StatusComplete  Status = "complete"
+	StatusAllFailed Status = "all_failed"
+	StatusDisabled  Status = "disabled"
+	StatusError     Status = "error"
 )
 
 type Action string
@@ -52,12 +52,12 @@ type Model struct {
 	materialsResult materialstui.ScanResult
 	search          SearchFunc
 
-	status         Status
-	searchErrors   []domainsearch.ProviderError
-	searchOutputs  []string
+	status          Status
+	searchErrors    []domainsearch.ProviderError
+	searchOutputs   []string
 	finalCandidates []contracts.ReferenceCandidate
-	materialCount  int
-	searchCount    int
+	materialCount   int
+	searchCount     int
 
 	action Action
 	err    error
@@ -93,6 +93,9 @@ func NewModel(opts Options) Model {
 }
 
 func (m Model) Init() tea.Cmd {
+	if !m.requirements.AllowOnlineSearch {
+		return m.disabledSearchCmd()
+	}
 	return m.searchCmd()
 }
 
@@ -229,6 +232,12 @@ func (m Model) searchCmd() tea.Cmd {
 			Limit:        10,
 		})
 		return SearchFinishedMsg{Result: result, Err: err}
+	}
+}
+
+func (m Model) disabledSearchCmd() tea.Cmd {
+	return func() tea.Msg {
+		return SearchFinishedMsg{Result: domainsearch.Result{}}
 	}
 }
 

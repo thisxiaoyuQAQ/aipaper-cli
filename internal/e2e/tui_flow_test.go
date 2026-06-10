@@ -25,6 +25,7 @@ import (
 
 func TestTUIFullFlowMockRuntimeContract(t *testing.T) {
 	workDir := t.TempDir()
+	t.Setenv("OPENAI_API_KEY", "test-runtime-key")
 	s := store.New(workDir)
 	writeTUIProjectConfig(t, workDir)
 	if _, err := runtimeapp.Bootstrap(workDir, mockTUIConfig()); err != nil {

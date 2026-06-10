@@ -148,7 +148,38 @@ type UsageSnapshot struct {
 
 缺失字段在 UI 中显示 `--`，不得阻塞写作。
 
-## 7. ChapterStatus
+## 7. MaterialsScanResult
+
+`MaterialsScan` 屏调用 `internal/materials.ProcessDir` 后，由 RootModel 通过 `ScreenTransitionMsg{Next: ScreenSearchProgress, Data: ScanResult}` 传递结果。该结果保留材料解析 manifest、输出路径和 BibTeX 候选，供 `SearchProgress` 与搜索候选合并。
+
+```go
+type ScanStats struct {
+    Total      int
+    Parsed     int
+    Failed     int
+    Skipped    int
+    Degraded   int
+    Candidates int
+}
+
+type ScanResult struct {
+    MaterialDir string
+    Manifest    contracts.MaterialManifest
+    Candidates  []contracts.ReferenceCandidate
+    Outputs     []string
+    Stats       ScanStats
+    Skipped     bool
+}
+```
+
+约定：
+
+- `Candidates` 仅来自用户材料中的 BibTeX 候选，下一步不得丢失。
+- 缺目录时可创建目录并停留在空状态；用户重新扫描后再继续。
+- 单文件失败不阻塞继续；全部失败时可重试、跳过或返回 Requirements。
+- `Skipped=true` 表示用户选择跳过材料扫描，下一步仍需根据已有候选或在线搜索决定是否能进入 References。
+
+## 8. ChapterStatus
 
 ```go
 type ChapterStatus string
@@ -165,13 +196,13 @@ const (
 
 右侧进度区展示章节状态、评分、重写次数、引用一致性。
 
-## 8. 安全约定
+## 9. 安全约定
 
 - `RuntimeEvent.Fields` 不得包含完整 API key、Authorization header、provider raw request。
 - ConfigWizard 摘要只显示脱敏 key，例如 `sk-...abcd`。
 - 错误详情中若包含请求上下文，必须先 redact。
 
-## 9. 与既有接口的关系
+## 10. 与既有接口的关系
 
 - `requirements.json` 仍使用 [requirements.md](./requirements.md)。
 - `references/candidates.json` 和 `references/confirmed.json` 仍使用 [references.md](./references.md)。

@@ -68,7 +68,7 @@ type RootModel struct {
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
 	// Exit confirmation state
-	exitConfirm      bool
+	exitConfirm       bool
 	exitConfirmScreen Screen
 
 	err error
@@ -122,6 +122,14 @@ func NewRootModel(opts RootOptions) RootModel {
 			m.Requirements = newRequirementsModel()
 		} else {
 			m.Materials = materialsModel
+		}
+	}
+	if screen == ScreenSearchProgress {
+		searchModel, err := newSearchModel(m.WorkDir, m.ScreenData)
+		if err != nil {
+			m.err = err
+		} else {
+			m.Search = searchModel
 		}
 	}
 	if screen == ScreenReferences {
@@ -329,8 +337,9 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.CurrentScreen = ScreenWriting
 				m.ScreenData = WritingResumeData{Recovery: result, RecoveryPrompt: result.RecoveryPrompt}
+				m.Writing = newWritingModel(m.WorkDir, m.ScreenData)
 				m.err = nil
-				return m, nil
+				return m, m.Writing.Init()
 			case RecoverActionRestart:
 				m.CurrentScreen = ScreenRequirements
 				m.ScreenData = RecoverActionRestart
@@ -495,10 +504,17 @@ func (m RootModel) updateMaterials(key string) (tea.Model, tea.Cmd) {
 	m.err = m.Materials.Err()
 	switch m.Materials.Action() {
 	case materialstui.ActionContinue, materialstui.ActionSkip:
+		result := m.Materials.Result()
+		searchModel, err := newSearchModel(m.WorkDir, result)
+		if err != nil {
+			m.err = err
+			return m, nil
+		}
 		m.CurrentScreen = ScreenSearchProgress
-		m.ScreenData = m.Materials.Result()
+		m.ScreenData = result
+		m.Search = searchModel
 		m.err = nil
-		return m, nil
+		return m, m.Search.Init()
 	case materialstui.ActionBack:
 		m.CurrentScreen = ScreenRequirements
 		m.ScreenData = materialstui.ActionBack
@@ -518,8 +534,14 @@ func (m RootModel) updateSearch(key string) (tea.Model, tea.Cmd) {
 	m.err = m.Search.Err()
 	switch m.Search.Action() {
 	case searchtui.ActionContinue, searchtui.ActionSkip:
+		referencesModel, err := newReferencesModel(m.WorkDir, m.Search.Result())
+		if err != nil {
+			m.err = err
+			return m, nil
+		}
 		m.CurrentScreen = ScreenReferences
 		m.ScreenData = m.Search.Result()
+		m.References = referencesModel
 		m.err = nil
 		return m, nil
 	case searchtui.ActionBack:
@@ -662,7 +684,7 @@ func newSearchModel(workDir string, data any) (searchtui.Model, error) {
 	}), nil
 }
 
-func newReferencesModel(workDir string, data any) (referencestui.Model, error) {
+func newReferencesModel(workDir string, _ any) (referencestui.Model, error) {
 	s := store.New(workDir)
 	candidates, err := references.LoadCandidates(s)
 	if err != nil {

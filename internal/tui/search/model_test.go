@@ -328,6 +328,44 @@ func TestSearchProgress_AllProvidersFailed_CanRetrySkipOrBack(t *testing.T) {
 	}
 }
 
+func TestSearchProgress_SearchDisabled_DoesNotCallSearchProvider(t *testing.T) {
+	tmpDir := t.TempDir()
+	s := store.New(tmpDir)
+	if err := store.EnsureLayout(s); err != nil {
+		t.Fatal(err)
+	}
+
+	called := false
+	m := NewModel(Options{
+		WorkDir: tmpDir,
+		Store:   s,
+		Requirements: contracts.Requirements{
+			AllowOnlineSearch: false,
+		},
+		MaterialsResult: materialstui.ScanResult{
+			Candidates: []contracts.ReferenceCandidate{{Title: "Material Paper", Source: "bibtex", Status: "pending"}},
+		},
+		Search: func(context.Context, store.Store, domainsearch.Options) (domainsearch.Result, error) {
+			called = true
+			return domainsearch.Result{}, nil
+		},
+	})
+
+	msg := m.Init()()
+	searchMsg, ok := msg.(SearchFinishedMsg)
+	if !ok {
+		t.Fatalf("expected SearchFinishedMsg, got %T", msg)
+	}
+	m.applySearchFinished(searchMsg)
+
+	if called {
+		t.Fatalf("search provider was called even though online search is disabled")
+	}
+	if m.status != StatusDisabled || len(m.finalCandidates) != 1 {
+		t.Fatalf("status=%q final=%#v, want disabled with material candidate", m.status, m.finalCandidates)
+	}
+}
+
 func TestSearchProgress_FinalIDsStartFromCand001(t *testing.T) {
 	tmpDir := t.TempDir()
 	s := store.New(tmpDir)

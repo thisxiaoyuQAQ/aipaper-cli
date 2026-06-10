@@ -71,7 +71,7 @@
 - 开发进度：`docs/开发进度.md`
 - 修复记录：`docs/修复记录.md`（如不存在，首次修复时创建）
 - TUI 增量任务：`vault/10-*.md` 至 `vault/22-*.md`（已完成）
-- Quality Engine 任务：`vault/23-*.md` 至 `vault/31-*.md`（进行中：23、24 已完成）
+- Quality Engine 任务：`vault/23-*.md` 至 `vault/31-*.md`（进行中：23、24、25 已完成）
 
 ## 勿动文件清单
 
@@ -94,6 +94,7 @@
 - `internal/e2e/tui_flow_test.go`：TUI mock 全流程状态契约、SearchProgress→References RootModel 转场、ConfigWizard runtime role 解析、文档一致性验收已稳定
 - `internal/quality/evidence.go`：EvidenceTable 类型、校验规则（confirmed reference、depth 渐进、ID 风格）与原子读写已稳定；24-31 在包内新增文件扩展，不应修改既有校验语义与错误码
 - `internal/quality/sectionplan.go`、`internal/quality/sectionplan_tools.go`：SectionQualityPlan 类型、校验规则（chapter_id 与 outline 一致、required_evidence_ids 存在于 Evidence Table）、原子读写与 save/load 工具已稳定；25-31 只应消费其接口，不应修改校验语义与错误码。`internal/agent.DefaultTools` 已追加 `quality.Tools(s)`，后续 quality 工具加入 `quality.Tools` 即自动注册
+- `internal/agent/writer_quality.go`、`internal/artifacts/claims.go`：Writer 证据协议（`WriterChapterInput` 注入、`GuardWriterClaims`/`WriteGuardedDraftBundle` 硬校验、`WRITER_CLAIM_*` 错误码）与 claims 兼容 warning（`ARTIFACT_CLAIM_MISSING_EVIDENCE`）已稳定；26-31 只应消费这些接口，不应放宽硬校验或修改错误码
 - `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；模块 22 已补齐真实 runtime 接入、stop adapter、真实 provider smoke 与 Windows 本机验收记录
 
 ## 分支策略

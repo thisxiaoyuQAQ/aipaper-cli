@@ -1,6 +1,6 @@
 # Quality Engine 质量产物契约
 
-> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`；模块 25-31 仍为规划产物。
+> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）、25（Writer 证据使用协议）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`、`internal/agent/writer_quality.go`、`internal/artifacts/claims.go`；模块 26-31 仍为规划产物。
 > 设计依据：`docs/superpowers/specs/2026-06-10-quality-engine-design.md` 第 3、4、5 节。
 
 ## 1. 存储路径
@@ -147,13 +147,44 @@ type ClaimNode struct {
 | 契约 | 扩展 | 模块 |
 | --- | --- | --- |
 | `Requirements`（requirements.md） | 新增 `quality_mode` 字段：`fast` / `enhanced`（默认）/ `strict`；旧文件缺字段时新 run 按 enhanced、恢复旧 run 走兼容模式 | 30 |
-| `Claim`（artifacts.md） | 新增 `evidence_ids []string`（必填 ≥1）；旧 claims.json 无该字段按兼容模式读取（warning 不阻断） | 25 |
+| `Claim`（artifacts.md） | ✅ 已实现（模块 25）：`evidence_ids []string`（新 Writer 产物必填 ≥1，JSON `omitempty`）；旧 claims.json 无该字段时严格读取仍通过，按兼容模式处理，`artifacts.ClaimEvidenceWarnings` 产出 `ARTIFACT_CLAIM_MISSING_EVIDENCE` warning（不阻断） | 25 |
 | `Review`（artifacts.md） | 新增 `rewrite_instructions` 数组：`claim_id?`、`location`、`problem`、`instruction`、`suggested_evidence_ids`、`severity(required/optional)`；向后兼容 | 28 |
 | Step 列表（checkpoint.md） | 新增 `evidence_extraction`（confirm_references 后）、`section_quality_plan`（create_outline 同期/后）、`claim_extraction`（每章 draft 后）、`claim_verification`（claim 抽取后、review 前），全部走现有 checkpoint 机制 | 24, 26, 27 |
 | `final/` 导出（export.md） | 新增 `final/quality-report.md`；`report.md` 增加质量摘要；质量报告生成失败不阻塞 paper.md/paper.docx | 29 |
 | TUI（tui.md） | Requirements 新增模式选择；WritingProgress 步骤区/章节状态（`verifying`/`needs_revision`）/日志区扩展；ExportSummary 质量结论行；StateProbe 探测 `quality/` 产物；RecoverPrompt 注明质量模式 | 30 |
 
-## 7. Host 工具（internal/quality）
+## 7. Writer 证据使用协议（模块 25，已实现）
+
+> 代码：`internal/agent/writer_quality.go`、`internal/artifacts/claims.go`、`internal/contracts/types.go`（Claim 扩展）
+
+Writer 每章输入（`writer_run` 工具在 confirmed 引用检查通过后注入，runner 收到的 args 即下述结构）：
+
+```go
+type WriterChapterInput struct {
+    ChapterID   string               `json:"chapter_id"`
+    QualityPlan *quality.SectionPlan `json:"quality_plan,omitempty"` // 本章质量计划
+    Evidence    []quality.Evidence   `json:"evidence,omitempty"`     // 本章 required evidence 的内容
+    Warnings    []string             `json:"warnings,omitempty"`     // 兼容模式提示（质量产物缺失等）
+}
+```
+
+- 质量产物缺失（旧 run 恢复）→ 兼容模式：注入 warning，不阻断 Writer 运行；
+- 质量产物存在但损坏 → 结构化错误（`AGENT_TOOL_FAILED`）。
+
+Host 硬校验（writer guard，公开 API）：
+
+- `agent.GuardWriterClaims(s, claims) error`：每个 claim 必须绑定 ≥1 个 `evidence_ids` 且全部存在于 Evidence Table；引用 key 必须存在于 confirmed.json（既有规则保持）；
+- `agent.WriteGuardedDraftBundle(s, bundle) (artifacts.WriteResult, error)`：guard 通过才落盘章节产物（draft/claims/citation map/notes），失败返回结构化错误并整体阻断写入（含 citation map 未确认 key 检查）。
+
+| 规则 | 错误码 |
+| --- | --- |
+| claim 无任何 evidence 绑定 | `WRITER_CLAIM_MISSING_EVIDENCE` |
+| evidence id 不在 Evidence Table | `WRITER_CLAIM_UNKNOWN_EVIDENCE` |
+| 引用 key 不在 confirmed.json（含伪造 key） | `WRITER_CLAIM_UNCONFIRMED_REFERENCE` |
+
+错误 `details` 携带 `chapter_id` 与 `claim_id`。Writer prompt 扩展（`CoordinatorSystemPrompt` 追加）：关键论断必须引用 quality plan 绑定的 evidence；材料不足显式标 gap；禁止编造来源（F7）。
+
+## 8. Host 工具（internal/quality）
 
 | 工具 | 状态 | 校验 |
 | --- | --- | --- |

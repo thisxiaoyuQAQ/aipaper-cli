@@ -45,6 +45,9 @@ func Tools(s store.Store) []agentcore.Tool {
 		NewLoadEvidenceTableTool(s),
 		NewSaveSectionQualityPlanTool(s),
 		NewLoadSectionQualityPlanTool(s),
+		NewSaveClaimGraphTool(s),
+		NewLoadClaimGraphTool(s),
+		NewExtractChapterClaimsTool(s),
 	}
 }
 

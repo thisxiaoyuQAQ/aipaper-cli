@@ -112,7 +112,11 @@ type Claim struct {
 	Text          string   `json:"text"`
 	Importance    string   `json:"importance"`
 	ReferenceKeys []string `json:"reference_keys"`
-	Confidence    float64  `json:"confidence,omitempty"`
+	// EvidenceIDs binds the claim to evidence table entries (ev_NNN). New
+	// writer output must carry at least one; legacy claims.json without the
+	// field still loads and is treated as compatibility mode (warning only).
+	EvidenceIDs []string `json:"evidence_ids,omitempty"`
+	Confidence  float64  `json:"confidence,omitempty"`
 }
 
 type CitationMap struct {

@@ -148,7 +148,18 @@ func NewWriterTool(s store.Store, runner WriterRunner) agentcore.Tool {
 			if len(confirmed.Items) == 0 {
 				return toolError(CodeNoneConfirmed, "Writer cannot run before the user confirms at least one reference", false)
 			}
-			result, err := runner.RunWriter(ctx, args)
+			input, err := BuildWriterChapterInput(s, args)
+			if err != nil {
+				if agentErr, ok := AsError(err); ok {
+					return ToolResponse{OK: false, Error: &agentErr}
+				}
+				return toolError(CodeToolExecutionFailed, err.Error(), false)
+			}
+			enriched, err := json.Marshal(input)
+			if err != nil {
+				return toolError(CodeToolExecutionFailed, fmt.Sprintf("marshal writer input: %v", err), false)
+			}
+			result, err := runner.RunWriter(ctx, enriched)
 			if err != nil {
 				if agentErr, ok := AsError(err); ok {
 					return ToolResponse{OK: false, Error: &agentErr}

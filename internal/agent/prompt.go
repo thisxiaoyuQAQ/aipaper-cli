@@ -26,6 +26,7 @@ func CoordinatorSystemPrompt(opts PromptOptions) string {
 		"Return concise structured JSON when the runtime requests a machine-readable decision.",
 	}
 	sections = append(sections, qualityPromptSections()...)
+	sections = append(sections, writerQualityPromptSections()...)
 	if strings.TrimSpace(opts.RecoveryPrompt) != "" {
 		sections = append(sections, "Recovery context:\n"+strings.TrimSpace(opts.RecoveryPrompt))
 	}

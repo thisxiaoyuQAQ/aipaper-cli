@@ -25,6 +25,7 @@ func CoordinatorSystemPrompt(opts PromptOptions) string {
 		"Host must not decide rewrites from scores. You must decide after reading Editor facts.",
 		"Return concise structured JSON when the runtime requests a machine-readable decision.",
 	}
+	sections = append(sections, qualityPromptSections()...)
 	if strings.TrimSpace(opts.RecoveryPrompt) != "" {
 		sections = append(sections, "Recovery context:\n"+strings.TrimSpace(opts.RecoveryPrompt))
 	}

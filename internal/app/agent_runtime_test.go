@@ -89,8 +89,15 @@ func TestNewAgentRuntimeUsesInjectedModelAndDoesNotCreateNetworkClient(t *testin
 	if runtime.Agent == nil || runtime.Provider != "openai" || runtime.Model != "gpt-test" {
 		t.Fatalf("runtime = %#v", runtime)
 	}
-	if len(runtime.Tools) != 5 {
+	if len(runtime.Tools) != 9 {
 		t.Fatalf("tools = %d", len(runtime.Tools))
+	}
+	toolNames := map[string]bool{}
+	for _, tool := range runtime.Tools {
+		toolNames[tool.Name()] = true
+	}
+	if !toolNames["save_evidence_table"] || !toolNames["save_section_quality_plan"] {
+		t.Fatalf("quality tools missing, names = %#v", toolNames)
 	}
 	if !strings.Contains(runtime.SystemPrompt, "resume from step 3") {
 		t.Fatalf("system prompt = %s", runtime.SystemPrompt)

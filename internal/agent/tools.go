@@ -11,6 +11,7 @@ import (
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/checkpoint"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -50,13 +51,14 @@ func (t jsonTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMe
 }
 
 func DefaultTools(s store.Store, writer WriterRunner) []agentcore.Tool {
-	return []agentcore.Tool{
+	tools := []agentcore.Tool{
 		NewRequirementsTool(s),
 		NewProgressTool(s),
 		NewConfirmedReferencesTool(s),
 		NewCheckpointValidationTool(s),
 		NewWriterTool(s, writer),
 	}
+	return append(tools, quality.Tools(s)...)
 }
 
 func NewRequirementsTool(s store.Store) agentcore.Tool {

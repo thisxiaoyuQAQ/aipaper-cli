@@ -1,6 +1,6 @@
-# Quality Engine 质量产物契约（规划中）
+# Quality Engine 质量产物契约
 
-> 状态：模块 23-31 规划产物，实现后以 `internal/quality` 代码为权威来源并更新本文件。
+> 状态：模块 23（EvidenceTable）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/tools.go`；模块 24-31 仍为规划产物。
 > 设计依据：`docs/superpowers/specs/2026-06-10-quality-engine-design.md` 第 3、4、5 节。
 
 ## 1. 存储路径
@@ -15,7 +15,9 @@
 
 写入沿用项目约定：temp + fsync + rename 原子写入、严格 JSON 读取（DisallowUnknownFields）、RFC3339 UTC 时间、正斜杠相对路径。
 
-## 2. EvidenceTable / Evidence（模块 23）
+## 2. EvidenceTable / Evidence（模块 23，已实现）
+
+> 代码：`internal/quality/evidence.go`
 
 ```go
 type EvidenceTable struct {
@@ -24,7 +26,7 @@ type EvidenceTable struct {
 }
 
 type Evidence struct {
-    ID           string   `json:"id"`            // ev_001 风格
+    ID           string   `json:"id"`            // ev_001 风格（^ev_\d{3,}$）
     ReferenceKey string   `json:"reference_key"` // 必须存在于 references/confirmed.json
     MaterialID   string   `json:"material_id,omitempty"` // 来自用户材料时关联 material_001
     Depth        string   `json:"depth"`         // metadata_only|abstract|snippet|fulltext_excerpt
@@ -40,7 +42,22 @@ type Evidence struct {
 }
 ```
 
-校验规则：`reference_key` 不在 confirmed → `evidence_unconfirmed_reference`；无材料全文解析文本时不允许 `snippet` / `fulltext_excerpt` depth。
+公开 API：
+
+- `SaveEvidenceTable(s, table) ([]string, error)`：先校验后写入 `quality/evidence-table.json` + `.md`（原子写入），返回相对路径列表；
+- `LoadEvidenceTable(s) (EvidenceTable, error)`：严格 JSON 读取（DisallowUnknownFields）；
+- `ValidateEvidenceTable(s, table) error`：单独校验；
+- `FormatEvidenceTableMarkdown(table) string`：Markdown 渲染。
+
+校验规则与错误码（结构化错误 `quality.Error{code,message,retryable,details}`）：
+
+| 规则 | 错误码 |
+| --- | --- |
+| `generated_at` 必填；id 必须 `ev_NNN`；depth/confidence 枚举合法；excerpt 仅 snippet 级以上允许 | `evidence_invalid` |
+| evidence id 重复 | `evidence_duplicate_id` |
+| `reference_key` 不在 confirmed.json（文件缺失视为零确认） | `evidence_unconfirmed_reference` |
+| `snippet`/`fulltext_excerpt` 必须有 `material_id` 且 `materials/extracted/<material_id>.md` 非空存在 | `evidence_depth_unsupported` |
+| 读写失败、JSON 不合法、文件缺失 | `evidence_io_failed` |
 
 ## 3. SectionQualityPlan / SectionPlan（模块 24）
 
@@ -117,14 +134,14 @@ type ClaimNode struct {
 
 ## 7. Host 工具（internal/quality）
 
-| 工具 | 校验 |
-| --- | --- |
-| `save_evidence_table` / `load_evidence_table` | schema + reference_key 必须 confirmed + depth 渐进规则 |
-| `save_section_quality_plan` / `load_section_quality_plan` | evidence ID 存在于 Evidence Table + chapter_id 与 outline 一致 |
-| `save_claim_graph` | reference_keys / evidence_ids / chapter_id 全部机器校验 |
-| `save_verification_result` | 支撑关系与风险等级写入，Host 据此算门控 |
-| `quality_gate_check` | 纯 Host 逻辑，接收 mode 参数 |
+| 工具 | 状态 | 校验 |
+| --- | --- | --- |
+| `save_evidence_table` / `load_evidence_table` | ✅ 已实现（`internal/quality/tools.go`，`quality.Tools(s)` 返回） | schema + reference_key 必须 confirmed + depth 渐进规则；save 入参 `{"table": EvidenceTable}`，严格解析未知字段拒绝 |
+| `save_section_quality_plan` / `load_section_quality_plan` | 规划（模块 24） | evidence ID 存在于 Evidence Table + chapter_id 与 outline 一致 |
+| `save_claim_graph` | 规划（模块 26） | reference_keys / evidence_ids / chapter_id 全部机器校验 |
+| `save_verification_result` | 规划（模块 27） | 支撑关系与风险等级写入，Host 据此算门控 |
+| `quality_gate_check` | 规划（模块 27） | 纯 Host 逻辑，接收 mode 参数 |
 
-工具失败统一返回 `{ok:false,error:{code,message,retryable,details}}`，不抛自然语言。
+工具失败统一返回 `{ok:false,error:{code,message,retryable,details}}`，不抛自然语言。工具注册进 agent runtime 的接线由模块 24 在 `internal/agent` 边界上完成。
 
 边界原则：「引用存在、claim 有 evidence、evidence 来自 confirmed」由 Host 机器校验；「证据是否真的支撑论断」由 Editor/verifier 语义判断，Host 只记录与执行结果。

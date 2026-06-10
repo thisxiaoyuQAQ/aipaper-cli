@@ -92,6 +92,7 @@
 - `internal/tui/exportsummary/`：ExportSummary model/view、复用 export.LoadInput/ExportFinal、依赖注入（Export/DocxExporter/Now）、错误处理（CodeNoAcceptedChapters/CodeUnconfirmedReference/CodeDocxFailed）已稳定
 - `internal/tui/done/`：Done 完成页 model、Result 注入、输出目录/文件列表/命令提示已稳定
 - `internal/e2e/tui_flow_test.go`：TUI mock 全流程状态契约、SearchProgress→References RootModel 转场、ConfigWizard runtime role 解析、文档一致性验收已稳定
+- `internal/quality/evidence.go`：EvidenceTable 类型、校验规则（confirmed reference、depth 渐进、ID 风格）与原子读写已稳定；24-31 在包内新增文件扩展，不应修改既有校验语义与错误码
 - `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；模块 22 已补齐真实 runtime 接入、stop adapter、真实 provider smoke 与 Windows 本机验收记录
 
 ## 分支策略

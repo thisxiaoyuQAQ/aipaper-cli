@@ -20,6 +20,7 @@ const (
 	docxPath          = "final/paper.docx"
 	referencesPath    = "final/references.md"
 	citationTracePath = "final/citation-trace.json"
+	qualityReportPath = "final/quality-report.md"
 	reportPath        = "final/report.md"
 )
 
@@ -83,6 +84,10 @@ func ExportFinal(s store.Store, input ExportInput, opts Options) (Result, error)
 			return Result{}, err
 		}
 	}
+	if issue := writeQualityReportIfAvailable(s, input, now, opts.QualityReportRenderer, &result); issue != nil {
+		issues = append(issues, *issue)
+	}
+	result.Issues = issues
 	report := renderReport(input, result, now)
 	if err := writeText(s, reportPath, "export_report", report, &result); err != nil {
 		return Result{}, err
@@ -222,9 +227,19 @@ func renderReport(input ExportInput, result Result, generatedAt time.Time) strin
 		fmt.Fprintf(&b, "- Docx: failed with `%s`\n", CodeDocxFailed)
 	}
 	fmt.Fprintf(&b, "- References: `%s`\n", referencesPath)
-	fmt.Fprintf(&b, "- Citation trace: `%s`\n\n", citationTracePath)
+	fmt.Fprintf(&b, "- Citation trace: `%s`\n", citationTracePath)
+	if input.Quality.Available && !hasIssue(result.Issues, CodeQualityReportFailed) {
+		fmt.Fprintf(&b, "- Quality report: `%s`\n", qualityReportPath)
+	} else if input.Quality.LoadError != "" || len(input.Quality.MissingArtifacts) > 0 {
+		fmt.Fprintf(&b, "- Quality report: not generated (compatibility mode)\n")
+	}
+	b.WriteString("\n")
 
-	b.WriteString("## Quality Summary\n\n")
+	renderReportQualitySummary(&b, input, result)
+
+	renderReportQualitySummary(&b, input, result)
+
+	b.WriteString("## Chapter Review Summary\n\n")
 	b.WriteString("| Chapter | Overall | Citation consistency | Passed | Unsupported claims |\n")
 	b.WriteString("| --- | ---: | ---: | --- | ---: |\n")
 	for _, chapter := range input.Chapters {
@@ -275,6 +290,38 @@ func renderReport(input ExportInput, result Result, generatedAt time.Time) strin
 		}
 	}
 	return b.String()
+}
+
+func renderReportQualitySummary(b *strings.Builder, input ExportInput, result Result) {
+	b.WriteString("## Quality Summary\n\n")
+	if !input.Quality.Available {
+		if len(input.Quality.MissingArtifacts) > 0 {
+			b.WriteString("Quality artifacts missing (compatibility mode):\n")
+			for _, artifact := range input.Quality.MissingArtifacts {
+				fmt.Fprintf(b, "- `%s`\n", artifact)
+			}
+		} else if input.Quality.LoadError != "" {
+			fmt.Fprintf(b, "Quality artifacts could not be loaded: %s\n", input.Quality.LoadError)
+		} else {
+			b.WriteString("Quality mode: not enabled for this run.\n")
+		}
+		b.WriteString("\n")
+		return
+	}
+	fmt.Fprintf(b, "- Mode: `%s`\n", input.Quality.Mode)
+	fmt.Fprintf(b, "- Gate conclusion: `%s`\n", input.Quality.GateOutcome.Conclusion)
+	if len(input.Quality.GateOutcome.Blockers) > 0 {
+		fmt.Fprintf(b, "- Hard blockers: %d\n", len(input.Quality.GateOutcome.Blockers))
+	}
+	if len(input.Quality.GateOutcome.Findings) > 0 {
+		fmt.Fprintf(b, "- Risk findings: %d\n", len(input.Quality.GateOutcome.Findings))
+	}
+	if hasIssue(result.Issues, CodeQualityReportFailed) {
+		b.WriteString("- Full quality report: generation failed (see Issues)\n")
+	} else {
+		fmt.Fprintf(b, "- Full quality report: `%s`\n", qualityReportPath)
+	}
+	b.WriteString("\n")
 }
 
 func referenceMap(confirmed contracts.ConfirmedReferences) map[string]contracts.ConfirmedReference {
@@ -341,4 +388,13 @@ func ensureTrailingNewline(s string) string {
 		return s
 	}
 	return s + "\n"
+}
+
+func hasIssue(issues []Issue, code string) bool {
+	for _, issue := range issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
 }

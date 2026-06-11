@@ -5,6 +5,7 @@ import (
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/checkpoint"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
 )
 
 const (
@@ -12,6 +13,8 @@ const (
 	CodeNoAcceptedChapters   = "EXPORT_NO_ACCEPTED_CHAPTERS"
 	CodeUnconfirmedReference = "EXPORT_UNCONFIRMED_REFERENCE"
 	CodeReferenceFormat      = "EXPORT_REFERENCE_FORMAT_WARNING"
+	CodeQualityReportFailed  = "EXPORT_QUALITY_REPORT_FAILED"
+	CodeQualityArtifactsMissing = "EXPORT_QUALITY_ARTIFACTS_MISSING"
 )
 
 type ExportInput struct {
@@ -20,6 +23,18 @@ type ExportInput struct {
 	Chapters            []ChapterInput
 	ConfirmedReferences contracts.ConfirmedReferences
 	CostEstimate        map[string]any
+	Quality             QualityInput
+}
+
+type QualityInput struct {
+	Available          bool
+	MissingArtifacts   []string
+	LoadError          string
+	Mode               string
+	EvidenceTable      quality.EvidenceTable
+	ClaimGraph         quality.ClaimGraph
+	VerificationResult quality.VerificationResult
+	GateOutcome        quality.GateOutcome
 }
 
 type ChapterInput struct {
@@ -34,8 +49,9 @@ type ChapterInput struct {
 }
 
 type Options struct {
-	Now          time.Time
-	DocxExporter DocxExporter
+	Now                   time.Time
+	DocxExporter          DocxExporter
+	QualityReportRenderer QualityReportRenderer
 }
 
 type Result struct {
@@ -80,6 +96,10 @@ type CitationTraceItem struct {
 
 type DocxExporter interface {
 	Export(markdown string) ([]byte, error)
+}
+
+type QualityReportRenderer interface {
+	RenderQualityReport(input ExportInput, generatedAt time.Time) (string, error)
 }
 
 type DocxExporterFunc func(markdown string) ([]byte, error)

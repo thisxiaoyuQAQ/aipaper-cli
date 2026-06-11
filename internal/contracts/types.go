@@ -13,6 +13,7 @@ type Requirements struct {
 	Scope              string   `json:"scope"`
 	Language           string   `json:"language"`
 	CitationStyle      string   `json:"citation_style"`
+	QualityMode        string   `json:"quality_mode,omitempty"`
 	TargetWords        int      `json:"target_words"`
 	MaterialDir        string   `json:"material_dir"`
 	AllowOnlineSearch  bool     `json:"allow_online_search"`

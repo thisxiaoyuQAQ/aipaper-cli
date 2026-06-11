@@ -215,15 +215,6 @@ func sampleExportInput() ExportInput {
 	}
 }
 
-func hasIssue(issues []Issue, code string) bool {
-	for _, issue := range issues {
-		if issue.Code == code {
-			return true
-		}
-	}
-	return false
-}
-
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)

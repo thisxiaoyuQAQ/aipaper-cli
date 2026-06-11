@@ -12,6 +12,7 @@ import (
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/artifacts"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -42,6 +43,7 @@ func LoadInput(s store.Store) (ExportInput, error) {
 		return ExportInput{}, err
 	}
 	input.Chapters = chapters
+	loadQualityArtifacts(s, &input)
 	return input, nil
 }
 
@@ -52,6 +54,7 @@ func loadRequirements(s store.Store, input *ExportInput) {
 	}
 	input.Title = strings.TrimSpace(req.Topic)
 	input.CitationStyle = strings.TrimSpace(req.CitationStyle)
+	input.Quality.Mode = strings.TrimSpace(req.QualityMode)
 }
 
 func loadRun(s store.Store, input *ExportInput) {
@@ -75,6 +78,89 @@ func loadOutline(s store.Store, input *ExportInput) outlineFile {
 		input.Title = strings.TrimSpace(outline.TitleSuggestion)
 	}
 	return outline
+}
+
+func loadQualityArtifacts(s store.Store, input *ExportInput) {
+	missing := []string{}
+
+	table, err := quality.LoadEvidenceTable(s)
+	if err != nil {
+		if qualityArtifactMissing(s, quality.EvidenceTableJSONRel) {
+			missing = append(missing, quality.EvidenceTableJSONRel)
+		} else {
+			input.Quality.LoadError = err.Error()
+		}
+	} else {
+		input.Quality.EvidenceTable = table
+	}
+
+	graph, err := quality.LoadClaimGraph(s)
+	if err != nil {
+		if qualityArtifactMissing(s, quality.ClaimGraphJSONRel) {
+			missing = append(missing, quality.ClaimGraphJSONRel)
+		} else {
+			input.Quality.LoadError = err.Error()
+		}
+	} else {
+		input.Quality.ClaimGraph = graph
+	}
+
+	verification, err := quality.LoadVerificationResult(s)
+	if err != nil {
+		if qualityArtifactMissing(s, quality.VerificationResultJSONRel) {
+			missing = append(missing, quality.VerificationResultJSONRel)
+		} else {
+			input.Quality.LoadError = err.Error()
+		}
+	} else {
+		input.Quality.VerificationResult = verification
+	}
+
+	input.Quality.MissingArtifacts = missing
+	if input.Quality.LoadError != "" || len(missing) > 0 {
+		return
+	}
+	mode, err := quality.NormalizeMode(input.Quality.Mode)
+	if err != nil {
+		input.Quality.LoadError = err.Error()
+		return
+	}
+	input.Quality.Mode = mode
+	evidenceByID := make(map[string]quality.Evidence, len(table.Items))
+	for _, item := range table.Items {
+		evidenceByID[item.ID] = item
+	}
+	input.Quality.GateOutcome = quality.EvaluateQualityGate(quality.GateInput{
+		Mode:          mode,
+		Graph:         graph,
+		ConfirmedKeys: confirmedKeySet(input.ConfirmedReferences),
+		EvidenceByID:  evidenceByID,
+		RewriteRounds: rewriteRoundsByChapter(input.Chapters),
+	})
+	input.Quality.Available = true
+}
+
+func qualityArtifactMissing(s store.Store, relPath string) bool {
+	_, err := os.Stat(s.Path(filepath.FromSlash(relPath)))
+	return os.IsNotExist(err)
+}
+
+func confirmedKeySet(confirmed contracts.ConfirmedReferences) map[string]bool {
+	keys := make(map[string]bool, len(confirmed.Items))
+	for _, ref := range confirmed.Items {
+		keys[ref.Key] = true
+	}
+	return keys
+}
+
+func rewriteRoundsByChapter(chapters []ChapterInput) map[string]int {
+	rounds := make(map[string]int, len(chapters))
+	for _, chapter := range chapters {
+		if chapter.Version > 1 {
+			rounds[chapter.ID] = chapter.Version - 1
+		}
+	}
+	return rounds
 }
 
 func loadAcceptedChapters(s store.Store, outline outlineFile) ([]ChapterInput, error) {

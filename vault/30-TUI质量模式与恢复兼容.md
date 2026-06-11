@@ -1,5 +1,7 @@
 # 30-TUI质量模式与恢复兼容
 
+**状态**: ✅ 已完成
+
 ## 任务目标
 
 TUI 接入 Quality Engine：Requirements 模式选择、WritingProgress/ExportSummary 质量信息展示、StateProbe/RecoverPrompt 恢复兼容。

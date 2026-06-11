@@ -25,7 +25,17 @@ func (r *fakeProgramRunner) Run(ctx context.Context, model tuiapp.RootModel, opt
 	return r.err
 }
 
+// isolateHome points HOME/USERPROFILE at an empty temp dir so StateProbe
+// cannot pick up the developer's real ~/.aipaper/config.json.
+func isolateHome(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+}
+
 func TestRunWithoutArgsCallsTUIRunner(t *testing.T) {
+	isolateHome(t)
 	var stdin, stdout, stderr bytes.Buffer
 	runner := &fakeProgramRunner{}
 

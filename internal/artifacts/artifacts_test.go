@@ -68,6 +68,20 @@ func TestWriteReviewAndCommitAccepted(t *testing.T) {
 	if _, err := CommitAccepted(s, "ch01", 1, failing); err == nil {
 		t.Fatalf("CommitAccepted(failing review) unexpectedly succeeded")
 	}
+
+	blocked := review
+	blocked.RewriteInstructions = []contracts.RewriteInstruction{{
+		Location:    "ch01 paragraph 1",
+		Problem:     "overstated",
+		Instruction: "Scope the claim to the cited evidence.",
+		Severity:    "required",
+	}}
+	if gate := EvaluateReview(blocked); gate.Passed || gate.Status != StatusRevisionRequired {
+		t.Fatalf("required instruction gate = %#v", gate)
+	}
+	if _, err := CommitAccepted(s, "ch01", 1, blocked); err == nil {
+		t.Fatalf("CommitAccepted(review with required instructions) unexpectedly succeeded")
+	}
 }
 
 func TestQualityGateAndChapterStateTransitions(t *testing.T) {

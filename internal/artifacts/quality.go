@@ -49,10 +49,23 @@ func EvaluateReview(review contracts.Review) GateResult {
 	if len(review.UnsupportedClaims) > 0 {
 		reasons = append(reasons, "unsupported claims present")
 	}
+	if required := countRequiredRewriteInstructions(review); required > 0 {
+		reasons = append(reasons, fmt.Sprintf("%d required rewrite instructions present", required))
+	}
 	if len(reasons) > 0 {
 		return GateResult{Passed: false, Status: StatusRevisionRequired, Reasons: reasons}
 	}
 	return GateResult{Passed: true, Status: StatusAccepted}
+}
+
+func countRequiredRewriteInstructions(review contracts.Review) int {
+	count := 0
+	for _, instruction := range review.RewriteInstructions {
+		if instruction.Severity == "required" {
+			count++
+		}
+	}
+	return count
 }
 
 func StatusAfterReview(review contracts.Review, revisionRounds int) GateResult {

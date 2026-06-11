@@ -31,7 +31,10 @@ type WriterChapterInput struct {
 	ChapterID   string               `json:"chapter_id"`
 	QualityPlan *quality.SectionPlan `json:"quality_plan,omitempty"`
 	Evidence    []quality.Evidence   `json:"evidence,omitempty"`
-	Warnings    []string             `json:"warnings,omitempty"`
+	// RewriteInstructions carry the previous review round's structured editor
+	// directives so a rewrite addresses each one (module 28).
+	RewriteInstructions []contracts.RewriteInstruction `json:"rewrite_instructions,omitempty"`
+	Warnings            []string                       `json:"warnings,omitempty"`
 }
 
 // BuildWriterChapterInput resolves the chapter quality plan and the contents
@@ -45,6 +48,9 @@ func BuildWriterChapterInput(s store.Store, raw json.RawMessage) (WriterChapterI
 		return WriterChapterInput{}, AgentError(CodeInvalidJSON, fmt.Sprintf("parse writer_run args: %v", err), false)
 	}
 	input := WriterChapterInput{ChapterID: args.ChapterID}
+	if err := attachRewriteInstructions(s, &input); err != nil {
+		return WriterChapterInput{}, err
+	}
 
 	plan, ok, err := loadSectionQualityPlanIfPresent(s)
 	if err != nil {

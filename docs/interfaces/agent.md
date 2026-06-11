@@ -140,13 +140,23 @@ Editor 输出：
 
 ```go
 type Review struct {
-    ChapterID         string       `json:"chapter_id"`
-    DraftVersion      int          `json:"draft_version"`
-    Scores            ReviewScores `json:"scores"`
-    Passed            bool         `json:"passed"`
-    UnsupportedClaims []string     `json:"unsupported_claims"`
-    RequiredFixes     []string     `json:"required_fixes"`
-    OptionalFixes     []string     `json:"optional_fixes"`
+    ChapterID           string               `json:"chapter_id"`
+    DraftVersion        int                  `json:"draft_version"`
+    Scores              ReviewScores         `json:"scores"`
+    Passed              bool                 `json:"passed"`
+    UnsupportedClaims   []string             `json:"unsupported_claims"`
+    RequiredFixes       []string             `json:"required_fixes"`
+    OptionalFixes       []string             `json:"optional_fixes"`
+    RewriteInstructions []RewriteInstruction `json:"rewrite_instructions,omitempty"`
+}
+
+type RewriteInstruction struct {
+    ClaimID              string   `json:"claim_id,omitempty"`
+    Location             string   `json:"location"`
+    Problem              string   `json:"problem"`
+    Instruction          string   `json:"instruction"`
+    SuggestedEvidenceIDs []string `json:"suggested_evidence_ids,omitempty"`
+    Severity             string   `json:"severity"` // required | optional
 }
 ```
 
@@ -157,6 +167,7 @@ type Review struct {
 - `scores.overall >= 80`
 - `scores.citation_consistency >= 90`
 - 不存在高风险 unsupported claim
+- 不存在 `severity=required` 的 `rewrite_instructions`；required 指令未覆盖时继续重写，超过 2 轮标记 `needs_human_review`
 
 未通过时进入重写。重写最多 2 轮，超过后标记 `needs_human_review`，但不阻塞后续章节。
 

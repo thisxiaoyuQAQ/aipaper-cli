@@ -109,13 +109,23 @@ type CitationMapping struct {
 
 ```go
 type Review struct {
-    ChapterID         string       `json:"chapter_id"`
-    DraftVersion      int          `json:"draft_version"`
-    Scores            ReviewScores `json:"scores"`
-    Passed            bool         `json:"passed"`
-    UnsupportedClaims []string     `json:"unsupported_claims"`
-    RequiredFixes     []string     `json:"required_fixes"`
-    OptionalFixes     []string     `json:"optional_fixes"`
+    ChapterID           string               `json:"chapter_id"`
+    DraftVersion        int                  `json:"draft_version"`
+    Scores              ReviewScores         `json:"scores"`
+    Passed              bool                 `json:"passed"`
+    UnsupportedClaims   []string             `json:"unsupported_claims"`
+    RequiredFixes       []string             `json:"required_fixes"`
+    OptionalFixes       []string             `json:"optional_fixes"`
+    RewriteInstructions []RewriteInstruction `json:"rewrite_instructions,omitempty"`
+}
+
+type RewriteInstruction struct {
+    ClaimID              string   `json:"claim_id,omitempty"`
+    Location             string   `json:"location"`
+    Problem              string   `json:"problem"`
+    Instruction          string   `json:"instruction"`
+    SuggestedEvidenceIDs []string `json:"suggested_evidence_ids,omitempty"`
+    Severity             string   `json:"severity"` // required | optional
 }
 
 type ReviewScores struct {
@@ -138,6 +148,13 @@ type ReviewScores struct {
 | UnsupportedClaims | `unsupported_claims` | 无支撑论断 ID 列表 |
 | RequiredFixes | `required_fixes` | 必须修改项 |
 | OptionalFixes | `optional_fixes` | 可选优化项 |
+| RewriteInstructions | `rewrite_instructions` | 结构化重写指令；旧 review 可缺省；`severity=required` 会阻止章节直接通过，进入下一轮或超限人工复核 |
+| RewriteInstruction.ClaimID | `claim_id` | 可选，关联 Claim Graph 中的 `claim_NNN` |
+| RewriteInstruction.Location | `location` | 章节/段落定位 |
+| RewriteInstruction.Problem | `problem` | 问题类型，如 unsupported / overstated / 泛化 / 重复 / 弱证据 |
+| RewriteInstruction.Instruction | `instruction` | Writer 需要执行的具体修改 |
+| RewriteInstruction.SuggestedEvidenceIDs | `suggested_evidence_ids` | 建议使用的 evidence id，必须存在于 Evidence Table |
+| RewriteInstruction.Severity | `severity` | `required` 或 `optional` |
 
 ```json
 {
@@ -153,7 +170,8 @@ type ReviewScores struct {
   "passed": true,
   "unsupported_claims": [],
   "required_fixes": [],
-  "optional_fixes": []
+  "optional_fixes": [],
+  "rewrite_instructions": []
 }
 ```
 
@@ -199,7 +217,7 @@ drafting ──> reviewing ──> accepted ──> committed
 实现类型与阈值：
 
 - `ChapterState`：记录 `chapter_id`、`status`、`draft_version`、`revision_rounds`。
-- `EvaluateReview`：要求 `review.passed == true`、`overall >= 80`、`citation_consistency >= 90`、`unsupported_claims` 为空。
+- `EvaluateReview`：要求 `review.passed == true`、`overall >= 80`、`citation_consistency >= 90`、`unsupported_claims` 为空，且没有 `severity=required` 的 `rewrite_instructions`。
 - `StatusAfterReview`：未通过且重写轮数小于 2 时返回 `revision_required`；达到 2 轮后返回 `needs_human_review`。
 
 ## 7. 产物一致性校验

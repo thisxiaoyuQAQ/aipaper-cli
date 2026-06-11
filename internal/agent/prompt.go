@@ -29,6 +29,7 @@ func CoordinatorSystemPrompt(opts PromptOptions) string {
 	sections = append(sections, writerQualityPromptSections()...)
 	sections = append(sections, claimGraphPromptSections()...)
 	sections = append(sections, claimVerificationPromptSections()...)
+	sections = append(sections, editorQualityPromptSections()...)
 	if strings.TrimSpace(opts.RecoveryPrompt) != "" {
 		sections = append(sections, "Recovery context:\n"+strings.TrimSpace(opts.RecoveryPrompt))
 	}

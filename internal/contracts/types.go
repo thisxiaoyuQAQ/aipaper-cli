@@ -139,6 +139,22 @@ type Review struct {
 	UnsupportedClaims []string     `json:"unsupported_claims"`
 	RequiredFixes     []string     `json:"required_fixes"`
 	OptionalFixes     []string     `json:"optional_fixes"`
+	// RewriteInstructions are structured editor directives that drive the
+	// rewrite loop (module 28). Legacy review.json without the field still
+	// loads; new editor output should carry one instruction per problem.
+	RewriteInstructions []RewriteInstruction `json:"rewrite_instructions,omitempty"`
+}
+
+// RewriteInstruction tells the Writer exactly what to change and which
+// evidence to use. Severity aligns with the existing required/optional fixes:
+// a required instruction blocks the chapter from passing until covered.
+type RewriteInstruction struct {
+	ClaimID              string   `json:"claim_id,omitempty"` // optional claim graph link
+	Location             string   `json:"location"`           // chapter/paragraph locator
+	Problem              string   `json:"problem"`            // unsupported / overstated / generalization / duplicate / weak evidence ...
+	Instruction          string   `json:"instruction"`        // concrete change to make
+	SuggestedEvidenceIDs []string `json:"suggested_evidence_ids,omitempty"`
+	Severity             string   `json:"severity"` // required | optional
 }
 
 type ReviewScores struct {

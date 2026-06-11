@@ -1,6 +1,6 @@
 # Quality Engine 质量产物契约
 
-> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）、25（Writer 证据使用协议）、26（ClaimGraph 写后抽取）、27（ClaimVerification 与质量门控）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/claimgraph.go`、`internal/quality/verification.go`、`internal/quality/gate.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`、`internal/quality/claimgraph_tools.go`、`internal/quality/verification_tools.go`、`internal/agent/writer_quality.go`、`internal/agent/claim_quality.go`、`internal/agent/verification_quality.go`、`internal/artifacts/claims.go`；模块 28-31 仍为规划产物。
+> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）、25（Writer 证据使用协议）、26（ClaimGraph 写后抽取）、27（ClaimVerification 与质量门控）、28（EditorRewriteInstructions）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/claimgraph.go`、`internal/quality/verification.go`、`internal/quality/gate.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`、`internal/quality/claimgraph_tools.go`、`internal/quality/verification_tools.go`、`internal/agent/writer_quality.go`、`internal/agent/claim_quality.go`、`internal/agent/verification_quality.go`、`internal/agent/editor_quality.go`、`internal/artifacts/claims.go`、`internal/artifacts/quality.go`、`internal/contracts/types.go`；模块 29-31 仍为规划产物。
 > 设计依据：`docs/superpowers/specs/2026-06-10-quality-engine-design.md` 第 3、4、5 节。
 
 ## 1. 存储路径
@@ -214,7 +214,7 @@ type ClaimVerdict struct {
 | --- | --- | --- |
 | `Requirements`（requirements.md） | 新增 `quality_mode` 字段：`fast` / `enhanced`（默认）/ `strict`；旧文件缺字段时新 run 按 enhanced、恢复旧 run 走兼容模式 | 30 |
 | `Claim`（artifacts.md） | ✅ 已实现（模块 25）：`evidence_ids []string`（新 Writer 产物必填 ≥1，JSON `omitempty`）；旧 claims.json 无该字段时严格读取仍通过，按兼容模式处理，`artifacts.ClaimEvidenceWarnings` 产出 `ARTIFACT_CLAIM_MISSING_EVIDENCE` warning（不阻断） | 25 |
-| `Review`（artifacts.md） | 新增 `rewrite_instructions` 数组：`claim_id?`、`location`、`problem`、`instruction`、`suggested_evidence_ids`、`severity(required/optional)`；向后兼容 | 28 |
+| `Review`（artifacts.md） | ✅ 已实现（模块 28）：新增 `rewrite_instructions` 数组（`claim_id?`、`location`、`problem`、`instruction`、`suggested_evidence_ids`、`severity(required/optional)`）；旧 review 缺字段仍可严格读取；`suggested_evidence_ids` / `claim_id` 由 Host 校验；required 指令会阻止章节直接通过 | 28 |
 | Step 列表（checkpoint.md） | `evidence_extraction`（confirm_references 后）、`section_quality_plan`（create_outline 同期/后）✅ 已实现（模块 24）；`claim_extraction`（每章 draft 后）✅ 已实现（模块 26）；`claim_verification`（claim 抽取后、review 前）✅ 已实现（模块 27，常量见 `internal/agent/verification_quality.go`），全部走现有 checkpoint 机制 | 24, 26, 27 |
 | `final/` 导出（export.md） | 新增 `final/quality-report.md`；`report.md` 增加质量摘要；质量报告生成失败不阻塞 paper.md/paper.docx | 29 |
 | TUI（tui.md） | Requirements 新增模式选择；WritingProgress 步骤区/章节状态（`verifying`/`needs_revision`）/日志区扩展；ExportSummary 质量结论行；StateProbe 探测 `quality/` 产物；RecoverPrompt 注明质量模式 | 30 |
@@ -227,10 +227,11 @@ Writer 每章输入（`writer_run` 工具在 confirmed 引用检查通过后注�
 
 ```go
 type WriterChapterInput struct {
-    ChapterID   string               `json:"chapter_id"`
-    QualityPlan *quality.SectionPlan `json:"quality_plan,omitempty"` // 本章质量计划
-    Evidence    []quality.Evidence   `json:"evidence,omitempty"`     // 本章 required evidence 的内容
-    Warnings    []string             `json:"warnings,omitempty"`     // 兼容模式提示（质量产物缺失等）
+    ChapterID             string                         `json:"chapter_id"`
+    QualityPlan           *quality.SectionPlan           `json:"quality_plan,omitempty"` // 本章质量计划
+    Evidence              []quality.Evidence             `json:"evidence,omitempty"`     // 本章 required evidence 的内容
+    RewriteInstructions   []contracts.RewriteInstruction `json:"rewrite_instructions,omitempty"` // 上一轮 Editor 结构化重写指令
+    Warnings              []string                       `json:"warnings,omitempty"`     // 兼容模式提示（质量产物缺失等）
 }
 ```
 

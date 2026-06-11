@@ -59,6 +59,7 @@ type Result struct {
 	Outputs     []checkpoint.OutputArtifact
 	Issues      []Issue
 	DocxWritten bool
+	Metadata    map[string]any
 }
 
 type Issue struct {

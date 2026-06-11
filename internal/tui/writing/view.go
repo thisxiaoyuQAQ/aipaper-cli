@@ -401,10 +401,14 @@ func (m Model) chapterStatusIcon(status ChapterStatus) string {
 		return "✍️"
 	case ChapterReviewing:
 		return "🔍"
+	case ChapterVerifying:
+		return "🔬"
 	case ChapterRewriting:
 		return "♻️"
 	case ChapterNeedsReview:
 		return "⚠️"
+	case ChapterNeedsRevision:
+		return "📝"
 	case ChapterPending:
 		return "⏳"
 	default:
@@ -416,9 +420,9 @@ func (m Model) chapterStatusStyle(status ChapterStatus) lipgloss.Style {
 	switch status {
 	case ChapterDone:
 		return chapterDoneStyle
-	case ChapterWriting, ChapterReviewing, ChapterRewriting:
+	case ChapterWriting, ChapterReviewing, ChapterVerifying, ChapterRewriting:
 		return chapterActiveStyle
-	case ChapterNeedsReview:
+	case ChapterNeedsReview, ChapterNeedsRevision:
 		return chapterErrorStyle
 	case ChapterPending:
 		return chapterPendingStyle

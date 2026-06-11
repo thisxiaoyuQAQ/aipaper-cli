@@ -78,11 +78,18 @@ func (m RecoverPromptModel) View() string {
 	if m.probe.ProgressStatus != "" {
 		fmt.Fprintf(&b, "Progress: %s\n", m.probe.ProgressStatus)
 	}
+	if m.probe.QualityMode != "" {
+		modeDesc := qualityModeDescription(m.probe.QualityMode)
+		fmt.Fprintf(&b, "Quality mode: %s (%s)\n", m.probe.QualityMode, modeDesc)
+	}
 	if len(m.probe.CheckpointErrors) > 0 {
 		b.WriteString("\nCheckpoint warnings:\n")
 		for _, err := range m.probe.CheckpointErrors {
 			fmt.Fprintf(&b, "- %s\n", err)
 		}
+	}
+	if !m.probe.HasQualityArtifacts && m.probe.QualityMode != "" && m.probe.QualityMode != "fast" {
+		b.WriteString("\n⚠ Compatibility mode: Quality artifacts missing, will continue with warnings-only.\n")
 	}
 	if m.confirmRestart {
 		b.WriteString("\nRestart keeps existing output files intact. Press y to confirm, n to cancel.\n")
@@ -90,6 +97,19 @@ func (m RecoverPromptModel) View() string {
 	}
 	b.WriteString("\nEnter/c: continue   r: restart flow   q: exit\n")
 	return b.String()
+}
+
+func qualityModeDescription(mode string) string {
+	switch mode {
+	case "fast":
+		return "quick draft"
+	case "enhanced":
+		return "quality balanced"
+	case "strict":
+		return "strict evidence"
+	default:
+		return "default"
+	}
 }
 
 func (m RecoverPromptModel) Action() RecoverPromptAction {

@@ -37,6 +37,10 @@ type ProbeResult struct {
 	CheckpointNextExpected string
 	CheckpointErrors       []string
 	ProgressStatus         string
+
+	// Quality engine fields
+	HasQualityArtifacts bool
+	QualityMode         string
 }
 
 func StateProbe(workDir string) (ProbeResult, error) {
@@ -81,6 +85,8 @@ func StateProbe(workDir string) (ProbeResult, error) {
 	result.HasAcceptedWork = hasAcceptedWork(s)
 	result.HasFinalOutputs = hasFinalOutputs(s)
 	result.HasRun = hasRun(s)
+	result.HasQualityArtifacts = hasQualityArtifacts(s)
+	result.QualityMode = detectQualityMode(workDir, s)
 	if result.HasFinalOutputs {
 		result.HasAcceptedWork = true
 	}
@@ -247,4 +253,32 @@ func onlyMissingLatest(errors []string) bool {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func hasQualityArtifacts(s store.Store) bool {
+	// Check for quality/ directory artifacts
+	qualityPaths := []string{
+		"quality/evidence-table.json",
+		"quality/section-quality-plan.json",
+		"quality/claim-graph.json",
+	}
+	for _, rel := range qualityPaths {
+		if fileExists(s.Path(filepath.FromSlash(rel))) {
+			return true
+		}
+	}
+	return false
+}
+
+func detectQualityMode(workDir string, s store.Store) string {
+	var req contracts.Requirements
+	if err := store.ReadJSON(s.RequirementsPath(), &req); err != nil {
+		return ""
+	}
+	mode := strings.TrimSpace(req.QualityMode)
+	if mode == "" {
+		// Default for new runs when requirements exist but no quality_mode set
+		return "enhanced"
+	}
+	return mode
 }

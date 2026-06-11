@@ -17,6 +17,7 @@ const (
 	FieldScope
 	FieldLanguage
 	FieldCitationStyle
+	FieldQualityMode
 	FieldTargetWords
 	FieldMaterialDir
 	FieldAllowOnlineSearch
@@ -31,6 +32,7 @@ var orderedFields = []Field{
 	FieldScope,
 	FieldLanguage,
 	FieldCitationStyle,
+	FieldQualityMode,
 	FieldTargetWords,
 	FieldMaterialDir,
 	FieldAllowOnlineSearch,
@@ -48,12 +50,17 @@ type Model struct {
 }
 
 func NewModel(defaults contracts.Requirements) Model {
+	qualityMode := defaults.QualityMode
+	if qualityMode == "" {
+		qualityMode = "enhanced"
+	}
 	values := map[Field]string{
 		FieldTopic:              defaults.Topic,
 		FieldResearchQuestions:  strings.Join(defaults.ResearchQuestions, "\n"),
 		FieldScope:              defaults.Scope,
 		FieldLanguage:           defaults.Language,
 		FieldCitationStyle:      defaults.CitationStyle,
+		FieldQualityMode:        qualityMode,
 		FieldTargetWords:        intString(defaults.TargetWords),
 		FieldMaterialDir:        defaults.MaterialDir,
 		FieldAllowOnlineSearch:  boolString(defaults.AllowOnlineSearch),
@@ -123,6 +130,7 @@ func (m Model) Requirements() (contracts.Requirements, error) {
 		Scope:              strings.TrimSpace(m.values[FieldScope]),
 		Language:           normalizeLanguage(m.values[FieldLanguage]),
 		CitationStyle:      normalizeCitationStyle(m.values[FieldCitationStyle], m.values[FieldLanguage]),
+		QualityMode:        normalizeQualityMode(m.values[FieldQualityMode]),
 		TargetWords:        targetWords,
 		MaterialDir:        strings.TrimSpace(m.values[FieldMaterialDir]),
 		AllowOnlineSearch:  parseBool(m.values[FieldAllowOnlineSearch]),
@@ -150,6 +158,11 @@ func Validate(req contracts.Requirements) error {
 	case "gbt7714", "apa":
 	default:
 		return fmt.Errorf("citation style must be gbt7714 or apa")
+	}
+	switch req.QualityMode {
+	case "", "fast", "enhanced", "strict":
+	default:
+		return fmt.Errorf("quality mode must be fast, enhanced, or strict")
 	}
 	if req.TargetWords <= 0 {
 		return fmt.Errorf("target words must be positive")
@@ -248,6 +261,18 @@ func normalizeCitationStyle(style, language string) string {
 		return "gbt7714"
 	}
 	return "apa"
+}
+
+func normalizeQualityMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	switch mode {
+	case "fast", "enhanced", "strict":
+		return mode
+	case "":
+		return "enhanced"
+	default:
+		return "enhanced"
+	}
 }
 
 func parseBool(value string) bool {

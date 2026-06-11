@@ -34,6 +34,8 @@ func fieldLabel(field Field) string {
 		return "Language"
 	case FieldCitationStyle:
 		return "Citation style"
+	case FieldQualityMode:
+		return "Quality mode"
 	case FieldTargetWords:
 		return "Target words"
 	case FieldMaterialDir:

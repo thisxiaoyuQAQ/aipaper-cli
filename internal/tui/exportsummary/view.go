@@ -59,6 +59,7 @@ func (m Model) View() string {
 	b.WriteString("\n\n")
 
 	b.WriteString(renderOutputs(m.result))
+	b.WriteString(renderQualitySummary(m.result))
 	b.WriteString(renderDocx(m.result))
 	b.WriteString(renderIssues(m.result))
 
@@ -111,6 +112,41 @@ func renderOutputs(result export.Result) string {
 		b.WriteString(pathStyle.Render(out.Path))
 		b.WriteString("\n")
 	}
+	return b.String()
+}
+
+func renderQualitySummary(result export.Result) string {
+	// Check if quality-report.md exists in outputs
+	hasQualityReport := false
+	for _, out := range result.Outputs {
+		if strings.Contains(out.Path, "quality-report.md") {
+			hasQualityReport = true
+			break
+		}
+	}
+	if !hasQualityReport {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(successStyle.Render("质量摘要:"))
+	b.WriteString("\n")
+
+	// Extract quality conclusion from result metadata if available
+	if result.Metadata != nil {
+		if qualityConclusion, ok := result.Metadata["quality_conclusion"].(string); ok && qualityConclusion != "" {
+			b.WriteString("  ")
+			b.WriteString(hintStyle.Render(qualityConclusion))
+			b.WriteString("\n")
+		}
+	}
+
+	// Show quality-report.md entry hint
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("详细质量报告: final/quality-report.md"))
+	b.WriteString("\n")
+
 	return b.String()
 }
 

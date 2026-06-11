@@ -88,6 +88,15 @@ func ExportFinal(s store.Store, input ExportInput, opts Options) (Result, error)
 		issues = append(issues, *issue)
 	}
 	result.Issues = issues
+
+	// Populate quality conclusion in metadata
+	if input.Quality.Available {
+		if result.Metadata == nil {
+			result.Metadata = make(map[string]any)
+		}
+		result.Metadata["quality_conclusion"] = buildQualityConclusion(input.Quality)
+	}
+
 	report := renderReport(input, result, now)
 	if err := writeText(s, reportPath, "export_report", report, &result); err != nil {
 		return Result{}, err
@@ -322,6 +331,34 @@ func renderReportQualitySummary(b *strings.Builder, input ExportInput, result Re
 		fmt.Fprintf(b, "- Full quality report: `%s`\n", qualityReportPath)
 	}
 	b.WriteString("\n")
+}
+
+func buildQualityConclusion(quality QualityInput) string {
+	if !quality.Available {
+		return "Quality artifacts not available (compatibility mode)"
+	}
+
+	conclusion := quality.GateOutcome.Conclusion
+	blockerCount := len(quality.GateOutcome.Blockers)
+	findingCount := len(quality.GateOutcome.Findings)
+
+	switch conclusion {
+	case "pass":
+		if findingCount == 0 {
+			return "质量门控：全部章节通过"
+		}
+		return fmt.Sprintf("质量门控：通过（%d 条建议）", findingCount)
+	case "pass_with_warnings":
+		return fmt.Sprintf("质量门控：通过但有 %d 条警告", findingCount)
+	case "needs_revision":
+		return fmt.Sprintf("质量门控：%d 章需要修订", findingCount)
+	case "needs_human_review":
+		return fmt.Sprintf("质量门控：%d 章需要人工复核", findingCount)
+	case "blocked":
+		return fmt.Sprintf("质量门控：已阻断（%d 条硬门槛问题）", blockerCount)
+	default:
+		return fmt.Sprintf("质量门控：%s", conclusion)
+	}
 }
 
 func referenceMap(confirmed contracts.ConfirmedReferences) map[string]contracts.ConfirmedReference {

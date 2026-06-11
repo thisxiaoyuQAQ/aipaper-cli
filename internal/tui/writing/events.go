@@ -56,9 +56,11 @@ const (
 	ChapterPending     ChapterStatus = "pending"
 	ChapterWriting     ChapterStatus = "writing"
 	ChapterReviewing   ChapterStatus = "reviewing"
+	ChapterVerifying   ChapterStatus = "verifying"
 	ChapterRewriting   ChapterStatus = "rewriting"
 	ChapterDone        ChapterStatus = "done"
 	ChapterNeedsReview ChapterStatus = "needs_human_review"
+	ChapterNeedsRevision ChapterStatus = "needs_revision"
 )
 
 // ChapterState holds the current state of a chapter.

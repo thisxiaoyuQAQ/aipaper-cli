@@ -9,8 +9,7 @@
 
 ## 一、验收结论
 
-✅ **自动化部分验收通过** — 三层验收中第一、二层全部通过；第三层 mock 结构对照完成，真实 provider 对照按规记录跳过原因。
-⏳ **主观部分待签字** — before/after 用户可感知质量提升由用户最终确认（`agent-output/request/QualityEngine-before-after-确认请求.md`）。
+✅ **验收通过（含主观签字）** — 三层验收全部完成：第一、二层自动化通过；第三层 mock 结构对照 + 真实 provider 对照（gpt-5.5）完成，用户已主观签字确认（验收结论：通过，签字人 ZHIYU，2026-06-13，见确认请求文档签字栏）。
 
 ---
 
@@ -120,6 +119,6 @@ fast 模式覆盖：
 ## 六、遗留事项
 
 1. ~~真实 provider before/after 对照待用户提供 API key 并授权后补跑~~ → 已于 2026-06-13 以 gpt-5.5 补跑完成（见 4.4 节）。
-2. 主观验收签字：`agent-output/request/QualityEngine-before-after-确认请求.md`。
+2. ~~主观验收签字~~ → 已签字：通过（ZHIYU，2026-06-13），见 `agent-output/request/QualityEngine-before-after-确认请求.md` 签字栏。
 3. **模块 22 接线缺口（建议走《Bug修复》流程）**：TUI 的 WritingProgress 从未真正启动 `app.NewAgentRuntime`，Writer/Editor 无 LLM runner 实现，`docs/开发进度.md` 中模块 22「真实 Runtime 接入」的完成记录与代码不符。在补齐接线前，真实 provider 只能经 `tools/real-before-after` harness 驱动，无法从 TUI 端到端运行。
 4. 密钥卫生：用户提供的 newapi key 曾以明文写入工作区文件（已移除、未进 git），建议轮换。

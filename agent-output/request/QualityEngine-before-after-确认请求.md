@@ -17,16 +17,16 @@
 
 请审阅 `docs/QualityEngine验收报告.md` 第 4.2 节结构对照表，确认以下用户可感知差异是否成立：
 
-- [ ] enhanced 模式下每条 claim 都有 evidence 绑定，伪造/未确认引用被硬阻断；
-- [ ] unsupported claim 被显式标出并推动重写（旧流程完全不可见）；
-- [ ] `final/quality-report.md` 与 `report.md` Quality Summary 可读、有助于判断综述可信度；
-- [ ] 旧项目（无质量产物）恢复与导出不受影响。
+- [X] enhanced 模式下每条 claim 都有 evidence 绑定，伪造/未确认引用被硬阻断；
+- [X] unsupported claim 被显式标出并推动重写（旧流程完全不可见）；
+- [X] `final/quality-report.md` 与 `report.md` Quality Summary 可读、有助于判断综述可信度；
+- [X] 旧项目（无质量产物）恢复与导出不受影响。
 
 **签字栏**：
 
-> 验收结论（通过 / 需修改 / 拒绝）：
-> 签字人：
-> 日期：
+> 验收结论（通过 / 需修改 / 拒绝）：通过
+> 签字人：ZHIYU
+> 日期：2026.6.13
 
 ## 请求二：真实 provider 对照补跑授权（可选）
 

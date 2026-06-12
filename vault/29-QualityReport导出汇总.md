@@ -1,5 +1,7 @@
 # 29-QualityReport导出汇总
 
+**状态**: ✅ 已完成
+
 ## 任务目标
 
 实现 `final/quality-report.md` 导出与现有 `report.md` 的质量摘要集成。

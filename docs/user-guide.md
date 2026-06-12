@@ -170,6 +170,16 @@ ConfigWizard ─→ Requirements ─→ MaterialsScan ─→ SearchProgress
 
 填写主题、研究问题、综述范围、目标语言、引用格式、目标字数等。完成后需求保存到 `requirements.json`。
 
+需求表单包含**质量模式**（`quality_mode`）三档选择，只改门控严格度，产物结构相同：
+
+| 模式 | 行为 |
+|---|---|
+| `fast` | 跳过逐条论断验证（claim 标记 `skipped`），分级风险只给警告 |
+| `enhanced`（默认） | 逐条论断验证；unsupported / overstated 论断触发章节重写 |
+| `strict` | 在 enhanced 基础上，浅证据支撑强结论、部分支撑等也升级为需修订 |
+
+无论哪档模式，**底线问题一律硬阻断**：引用未确认或伪造的文献 key、论断没有绑定证据、证据指向未确认引用。旧项目（无 `quality_mode` 字段）恢复时按兼容模式继续，不被阻断。
+
 ### MaterialsScan（扫描材料）
 
 自动扫描 `materials/` 目录，解析全部文件。单个文件解析失败不影响其余文件。扫描结果展示已解析/失败/降级的文件统计。
@@ -200,7 +210,7 @@ ConfigWizard ─→ Requirements ─→ MaterialsScan ─→ SearchProgress
 
 ### ExportSummary（导出摘要）
 
-展示导出结果：生成的文件列表、质量摘要、需人工复核的章节。
+展示导出结果：生成的文件列表、质量摘要（质量门控结论行，如"质量门控：1 章需要修订"）、需人工复核的章节。质量产物缺失的旧项目显示兼容模式提示。
 
 ### Done（完成页）
 
@@ -218,7 +228,8 @@ ConfigWizard ─→ Requirements ─→ MaterialsScan ─→ SearchProgress
 | `final/paper.docx` | Word 文档（基础排版，不承诺复杂格式） |
 | `final/references.md` | 参考文献列表 |
 | `final/citation-trace.json` | 引用追踪：章节 → 段落 → 论断 → 文献来源 |
-| `final/report.md` | 质量报告：评分、需复核项、风险提示 |
+| `final/report.md` | 质量报告：评分、需复核项、风险提示；含 Quality Summary（质量模式与门控结论） |
+| `final/quality-report.md` | 质量引擎报告：门控结论、证据深度分布、论断支持度、unsupported/overstated 清单、重写汇总与下一步建议（仅当质量产物存在时生成；旧项目兼容模式不生成且不影响其他导出） |
 
 ### 中间产物
 

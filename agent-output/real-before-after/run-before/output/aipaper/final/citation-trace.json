@@ -1,0 +1,150 @@
+{
+  "version": "export-20260612T163458Z",
+  "generated_at": "2026-06-12T16:34:58.8386808Z",
+  "items": [
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_001",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_001",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_002",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_002",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_003",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_003",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_004",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch01",
+      "paragraph_id": "ch01_p001",
+      "claim_id": "ch01_claim_004",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_001",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_001",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_002",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_002",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_003",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_003",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_004",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    },
+    {
+      "chapter_id": "ch02",
+      "paragraph_id": "ch02_p001",
+      "claim_id": "ch02_claim_004",
+      "reference_key": "chen2024CbtIOutcomes",
+      "source_type": "academic_search",
+      "editor_verified": true,
+      "needs_human_review": false
+    }
+  ]
+}

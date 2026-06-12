@@ -1,0 +1,1 @@
+Evidence for this chapter is snippet-level and comes only from ev_002. Claims are therefore softened: the draft avoids asserting comparative superiority, uniform efficacy, or stable long-term outcomes. No claims were made about specific populations, comorbid conditions, or six-month durability because those points are not supported by the required evidence for this chapter.

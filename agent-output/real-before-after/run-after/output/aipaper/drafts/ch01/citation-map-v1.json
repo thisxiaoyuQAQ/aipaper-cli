@@ -1,0 +1,19 @@
+{
+  "chapter_id": "ch01",
+  "draft_version": 1,
+  "mappings": [
+    {
+      "paragraph_id": "ch01_p001",
+      "claim_ids": [
+        "ch01_claim_001",
+        "ch01_claim_002",
+        "ch01_claim_003",
+        "ch01_claim_004",
+        "ch01_claim_005"
+      ],
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ]
+    }
+  ]
+}

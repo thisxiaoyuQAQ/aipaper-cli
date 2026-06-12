@@ -36,3 +36,12 @@
 2. 答复"授权真实 provider 对照"，Agent 将以 quality-mini 材料分别在兼容旧流程与 enhanced 模式各跑一次短综述（2 章、低字数），把真实对照结果补录到验收报告第四节。
 
 不补跑不影响自动化验收结论；mock 结构对照已覆盖 spec 7.3 的结构性要求。
+
+---
+
+## 补跑记录（2026-06-13）
+
+- 用户已在本文档提供 newapi 渠道（base_url `https://api.smmmc.cn`）与 API key，并指定模型 **gpt-5.5**，视为授权真实 provider 对照。
+- 明文 key 已从本文档移除（仅以环境变量 `SMOKE_API_KEY` 注入运行进程，未写入任何落盘文件/git）；**建议用户轮换该 key**——它曾以明文短暂存在于工作区文件中。
+- 补跑结果已录入 `docs/QualityEngine验收报告.md` 第 4.4 节；运行产物见 `agent-output/real-before-after/`（run-before / run-after）。
+- 复跑方式：`SMOKE_API_KEY=... SMOKE_BASE_URL=https://api.smmmc.cn/v1 SMOKE_MODEL=gpt-5.5 go run ./tools/real-before-after`

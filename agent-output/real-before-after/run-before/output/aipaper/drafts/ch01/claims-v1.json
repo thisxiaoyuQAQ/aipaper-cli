@@ -1,0 +1,42 @@
+{
+  "chapter_id": "ch01",
+  "draft_version": 1,
+  "claims": [
+    {
+      "id": "ch01_claim_001",
+      "text": "Therapist guided CBT-I reduced sleep onset latency in a randomized trial of 120 adults, with benefits persisting at six-month follow-up.",
+      "importance": "high",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "ch01_claim_002",
+      "text": "Adherence to CBT-I may decline among participants with shift work schedules, indicating the need for individualized monitoring and support.",
+      "importance": "medium",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "ch01_claim_003",
+      "text": "The generalizability of CBT-I trial findings is limited because patients with comorbid depression were excluded.",
+      "importance": "medium",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "ch01_claim_004",
+      "text": "Digital sleep interventions reproduce parts of therapist guided CBT-I but show variable effect sizes and limited durability evidence, making therapist guided CBT-I the stronger benchmark.",
+      "importance": "medium",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "confidence": 0.85
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-06-12T16:34:58.8848329Z",
+  "items": [
+    {
+      "id": "ev_001",
+      "reference_key": "chen2024CbtIOutcomes",
+      "depth": "abstract",
+      "topics": [
+        "cbt-i"
+      ],
+      "key_findings": [
+        "improved sleep onset latency in a randomized trial of 120 adults; effect persisted at six month follow up; sample excluded comorbid depression"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "id": "ev_002",
+      "reference_key": "garcia2023DigitalDeliverySleep",
+      "material_id": "material_002",
+      "depth": "snippet",
+      "topics": [
+        "digital sleep"
+      ],
+      "key_findings": [
+        "app delivered programs retain partial efficacy; effect sizes vary widely; most trials are short"
+      ],
+      "excerpt": "Reported effect sizes vary widely across studies, and most trials are short, so durability claims need stronger evidence.",
+      "confidence": "medium"
+    }
+  ]
+}

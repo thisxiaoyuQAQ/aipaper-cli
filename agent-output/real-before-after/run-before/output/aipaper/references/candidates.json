@@ -1,0 +1,43 @@
+{
+  "items": [
+    {
+      "id": "cand_001",
+      "title": "CBT-I Outcomes in Adults",
+      "authors": [
+        "Chen, Wei"
+      ],
+      "year": 2024,
+      "source": "bibtex",
+      "doi": "10.1000/cbti-outcomes",
+      "abstract": "A randomized trial of cognitive behavioral therapy for insomnia in adults reporting improved sleep onset latency.",
+      "dedupe_group": "doi:10.1000/cbti-outcomes",
+      "status": "pending"
+    },
+    {
+      "id": "cand_002",
+      "title": "Digital Delivery of Sleep Therapy",
+      "authors": [
+        "Garcia, Maria"
+      ],
+      "year": 2023,
+      "source": "bibtex",
+      "doi": "10.1000/digital-sleep",
+      "abstract": "App delivered sleep therapy retains partial efficacy compared with therapist guided programs.",
+      "dedupe_group": "doi:10.1000/digital-sleep",
+      "status": "pending"
+    },
+    {
+      "id": "cand_003",
+      "title": "Sleep Tracking Wearables",
+      "authors": [
+        "Lee, Min"
+      ],
+      "year": 2025,
+      "source": "bibtex",
+      "doi": "10.1000/wearables-sleep",
+      "abstract": "Consumer wearables estimate sleep stages with mixed accuracy. This entry stays unconfirmed in the quality-mini fixture.",
+      "dedupe_group": "doi:10.1000/wearables-sleep",
+      "status": "pending"
+    }
+  ]
+}

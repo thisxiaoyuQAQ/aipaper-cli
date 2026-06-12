@@ -1,0 +1,158 @@
+{
+  "updated_at": "2026-06-12T16:35:52.5695001Z",
+  "claims": [
+    {
+      "id": "claim_001",
+      "source_claim_id": "ch01_claim_001",
+      "text": "Therapist guided CBT-I improved sleep onset latency in a randomized trial of 120 adults.",
+      "chapter_id": "ch01",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "support": "partially_supported",
+      "risk_level": "low",
+      "verifier_note": "Evidence supports improved sleep onset latency in a randomized trial of 120 adults, but the provided evidence text does not explicitly identify the intervention as therapist-guided CBT-I.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_002",
+      "source_claim_id": "ch01_claim_002",
+      "text": "The improvement in sleep onset latency persisted at six-month follow-up.",
+      "chapter_id": "ch01",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "support": "supported",
+      "risk_level": "low",
+      "verifier_note": "Evidence explicitly states that the effect persisted at six-month follow-up.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_003",
+      "source_claim_id": "ch01_claim_003",
+      "text": "The evidence supports conclusions about sleep initiation but not broad improvement across all insomnia symptoms or adult subgroups.",
+      "chapter_id": "ch01",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "support": "partially_supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence supports conclusions about sleep onset latency and notes exclusion of comorbid depression, but it does not fully establish limitations across all insomnia symptoms or all adult subgroups beyond that exclusion.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_004",
+      "source_claim_id": "ch01_claim_004",
+      "text": "Because patients with comorbid depression were excluded, findings should not be generalized to insomnia with comorbid depression.",
+      "chapter_id": "ch01",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "support": "supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence states that patients with comorbid depression were excluded, supporting caution against generalizing findings to insomnia with comorbid depression.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_005",
+      "source_claim_id": "ch01_claim_005",
+      "text": "Durability should be limited to the observed six-month follow-up, without claims of longer-term persistence.",
+      "chapter_id": "ch01",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "support": "supported",
+      "risk_level": "low",
+      "verifier_note": "Evidence reports persistence only at six-month follow-up, so limiting durability claims to that observed interval is supported.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_006",
+      "source_claim_id": "ch02_claim_001",
+      "text": "App-delivered sleep programs reproduce selected components of therapist-guided protocols and may retain partial efficacy for insomnia-related outcomes.",
+      "chapter_id": "ch02",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "support": "partially_supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence supports partial efficacy of app-delivered programs, but it does not state that these programs reproduce selected components of therapist-guided protocols.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_007",
+      "source_claim_id": "ch02_claim_002",
+      "text": "Reported effect sizes for digital sleep therapy vary widely across studies, limiting confidence in consistent efficacy across platforms.",
+      "chapter_id": "ch02",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "support": "supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence explicitly states that effect sizes vary widely, which supports reduced confidence in consistent efficacy across platforms.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_008",
+      "source_claim_id": "ch02_claim_003",
+      "text": "Most trials of digital sleep interventions are short, so current evidence does not support strong conclusions about long-term durability.",
+      "chapter_id": "ch02",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "support": "supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence states that most trials are short, supporting the conclusion that strong claims about long-term durability are not warranted.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    },
+    {
+      "id": "claim_009",
+      "source_claim_id": "ch02_claim_004",
+      "text": "Digital sleep therapy is best characterized as a promising but heterogeneous delivery model rather than a uniformly effective replacement for therapist-guided CBT-I.",
+      "chapter_id": "ch02",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "support": "partially_supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence supports that digital sleep therapy has partial efficacy and heterogeneous effects, but it does not directly compare it with therapist-guided CBT-I as a replacement.",
+      "needs_rewrite": false,
+      "needs_human_review": false
+    }
+  ]
+}

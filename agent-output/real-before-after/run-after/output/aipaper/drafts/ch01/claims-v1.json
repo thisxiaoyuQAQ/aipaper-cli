@@ -1,0 +1,66 @@
+{
+  "chapter_id": "ch01",
+  "draft_version": 1,
+  "claims": [
+    {
+      "id": "ch01_claim_001",
+      "text": "Therapist guided CBT-I improved sleep onset latency in a randomized trial of 120 adults.",
+      "importance": "high",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "ch01_claim_002",
+      "text": "The improvement in sleep onset latency persisted at six-month follow-up.",
+      "importance": "high",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "id": "ch01_claim_003",
+      "text": "The evidence supports conclusions about sleep initiation but not broad improvement across all insomnia symptoms or adult subgroups.",
+      "importance": "medium",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "confidence": 0.75
+    },
+    {
+      "id": "ch01_claim_004",
+      "text": "Because patients with comorbid depression were excluded, findings should not be generalized to insomnia with comorbid depression.",
+      "importance": "high",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "ch01_claim_005",
+      "text": "Durability should be limited to the observed six-month follow-up, without claims of longer-term persistence.",
+      "importance": "medium",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "evidence_ids": [
+        "ev_001"
+      ],
+      "confidence": 0.85
+    }
+  ]
+}

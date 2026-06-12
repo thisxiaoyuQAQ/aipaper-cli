@@ -1,0 +1,1 @@
+Evidence was limited to an abstract-level report of one RCT. Claims were softened to avoid overgeneralizing beyond sleep onset latency, selected adult primary insomnia samples, and six-month follow-up. No conclusions were drawn for patients with comorbid depression because they were excluded from the trial.

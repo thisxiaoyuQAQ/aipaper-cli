@@ -1,0 +1,18 @@
+{
+  "chapter_id": "ch02",
+  "draft_version": 1,
+  "mappings": [
+    {
+      "paragraph_id": "ch02_p001",
+      "claim_ids": [
+        "ch02_claim_001",
+        "ch02_claim_002",
+        "ch02_claim_003",
+        "ch02_claim_004"
+      ],
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ]
+    }
+  ]
+}

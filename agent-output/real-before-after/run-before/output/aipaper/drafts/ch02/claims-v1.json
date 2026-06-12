@@ -1,0 +1,43 @@
+{
+  "chapter_id": "ch02",
+  "draft_version": 1,
+  "claims": [
+    {
+      "id": "ch02_claim_001",
+      "text": "App-delivered sleep therapy reproduces selected elements of therapist-guided CBT-I and can retain partial efficacy, but it may lack individualization and accountability.",
+      "importance": "high",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "confidence": 0.86
+    },
+    {
+      "id": "ch02_claim_002",
+      "text": "Reported effects of digital sleep interventions vary widely across studies, limiting strong conclusions about durability.",
+      "importance": "high",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "confidence": 0.84
+    },
+    {
+      "id": "ch02_claim_003",
+      "text": "Structured CBT-I improves sleep onset latency in adults, with benefits observed at six-month follow-up, although adherence may decline among shift workers.",
+      "importance": "medium",
+      "reference_keys": [
+        "chen2024CbtIOutcomes"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "ch02_claim_004",
+      "text": "Digital sleep therapy is best understood as a scalable delivery model that requires longer trials and better adherence reporting before equivalence to therapist-guided care can be assumed.",
+      "importance": "high",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep",
+        "chen2024CbtIOutcomes"
+      ],
+      "confidence": 0.8
+    }
+  ]
+}

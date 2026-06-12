@@ -1,0 +1,59 @@
+{
+  "updated_at": "2026-06-12T16:35:52.5695001Z",
+  "verdicts": [
+    {
+      "claim_id": "claim_001",
+      "support": "partially_supported",
+      "risk_level": "low",
+      "verifier_note": "Evidence supports improved sleep onset latency in a randomized trial of 120 adults, but the provided evidence text does not explicitly identify the intervention as therapist-guided CBT-I."
+    },
+    {
+      "claim_id": "claim_002",
+      "support": "supported",
+      "risk_level": "low",
+      "verifier_note": "Evidence explicitly states that the effect persisted at six-month follow-up."
+    },
+    {
+      "claim_id": "claim_003",
+      "support": "partially_supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence supports conclusions about sleep onset latency and notes exclusion of comorbid depression, but it does not fully establish limitations across all insomnia symptoms or all adult subgroups beyond that exclusion."
+    },
+    {
+      "claim_id": "claim_004",
+      "support": "supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence states that patients with comorbid depression were excluded, supporting caution against generalizing findings to insomnia with comorbid depression."
+    },
+    {
+      "claim_id": "claim_005",
+      "support": "supported",
+      "risk_level": "low",
+      "verifier_note": "Evidence reports persistence only at six-month follow-up, so limiting durability claims to that observed interval is supported."
+    },
+    {
+      "claim_id": "claim_006",
+      "support": "partially_supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence supports partial efficacy of app-delivered programs, but it does not state that these programs reproduce selected components of therapist-guided protocols."
+    },
+    {
+      "claim_id": "claim_007",
+      "support": "supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence explicitly states that effect sizes vary widely, which supports reduced confidence in consistent efficacy across platforms."
+    },
+    {
+      "claim_id": "claim_008",
+      "support": "supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence states that most trials are short, supporting the conclusion that strong claims about long-term durability are not warranted."
+    },
+    {
+      "claim_id": "claim_009",
+      "support": "partially_supported",
+      "risk_level": "medium",
+      "verifier_note": "Evidence supports that digital sleep therapy has partial efficacy and heterogeneous effects, but it does not directly compare it with therapist-guided CBT-I as a replacement."
+    }
+  ]
+}

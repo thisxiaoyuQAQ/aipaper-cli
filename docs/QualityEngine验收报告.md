@@ -64,7 +64,7 @@ fast 模式覆盖：
 
 ### 4.1 运行方式与跳过说明
 
-- **真实 provider 对照：跳过**。原因：本机环境无 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `AIPAPER_API_KEY`，且按项目备忘录约定真实 provider 调用属外向操作须用户事先授权（沿用模块 21/22 做法）。用户提供 key 并授权后可随时补跑。
+- **真实 provider 对照：已补跑（2026-06-13）**。用户在确认请求文档提供 newapi 渠道（`https://api.smmmc.cn`）并指定模型 `gpt-5.5`，视为授权；结果见 4.4 节。初次验收时（2026-06-12）因本机无 API key 曾跳过，跳过原因保留如下：本机环境无 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `AIPAPER_API_KEY`，且按项目备忘录约定真实 provider 调用属外向操作须用户事先授权（沿用模块 21/22 做法）。
 - **mock 结构对照：已完成**。`internal/e2e/before_after_test.go`（`TestE2EBeforeAfterStructuralComparison`）：同一组 quality-mini 材料（2 章、低字数）分别走 **兼容旧流程**（无质量产物、claims 不带 evidence_ids、直接 `WriteDraftBundle`）与 **enhanced 模式**（证据表 → writer guard → claim 抽取 → verification → gate → 导出）。
 - 材料说明：vault 建议"可扩充 fixtures/materials"；因 `fixtures/materials` 被材料解析单测按条目数断言锁定，本层复用了为模块 31 新建的 `fixtures/quality-mini/materials`（真实风格短材料，2 章题材），未动 `fixtures/materials`。
 
@@ -83,6 +83,26 @@ fast 模式覆盖：
 - 模块 29 `buildQualityConclusion` 把 findings 条数当章数展示（实测 "3 章需要修订" 实为 3 条 findings 分布在 2 章）。已改为按严重度去重统计章节数（commit `c802c49`），修复后实测输出 "质量门控：1 章需要修订"，与 needs_revision 严重度仅命中 ch02 一章一致。
 - 行为记录（非缺陷）：兼容模式下 `ExportFinal` 不写 `Metadata["quality_conclusion"]`（留空由 TUI 按兼容模式渲染），`buildQualityConclusion` 的兼容分支为防御性代码。
 
+### 4.4 真实 provider 对照（gpt-5.5，2026-06-13 补跑）
+
+**重要前置发现**：复核中确认产品代码里 **TUI→AgentRuntime 接线缺失**——`WritingProgress.Init()` 返回 nil（注释仍为 "In real implementation, this would launch AgentRuntime"），`app.NewAgentRuntime` 在全部分支历史中无任何 TUI/CLI 调用点，Writer/Editor 亦无 LLM runner 实现。即模块 22「真实 Runtime 接入」的完成声明与代码不符，真实 provider 全流程无法经产品路径运行（见第六节遗留事项 3）。
+
+因此本次对照经 `tools/real-before-after/` harness 直接驱动真实 LLM 走产品契约（config→litellm 链路、`WriteDraftBundle`/`WriteGuardedDraftBundle`、`ExtractChapterClaimGraph`、`SaveVerificationResult`、`ExportFinal` 全为产品代码；Editor 评分两侧均为 mock 通过，使对照只隔离证据协议变量）：
+
+- 连通性 smoke：endpoint 经产品 config→litellm 路径单次调用成功（先以 deepseek-v4-pro 验证 1.5s/60 tokens，后按用户指定改用 gpt-5.5 跑全程）。
+- 材料：`fixtures/quality-mini/materials`（2 章、低字数，约 300 词目标），确认 chen/garcia 两篇、lee2025 故意不确认——与 mock 对照同构。
+
+| 对照维度 | before（兼容旧流程，gpt-5.5 真实写作） | after（enhanced，gpt-5.5 真实写作+真实 verifier） |
+|---|---|---|
+| 写前约束 | 无 | 真实 Architect 生成 SectionQualityPlan（questions/required_evidence/boundaries），注入 Writer 提示词 |
+| evidence 绑定 | 8 条 claim 全部无绑定（兼容 warning） | 9 条 claim 全部绑定 evidence，writer guard 一次通过、零阻断 |
+| claim 支撑核算 | 不可知（无 verification） | 真实 verifier 9/9 verdict：supported 5、partially_supported 4、unsupported 0 |
+| 真实抓到的问题 | 同类过度声称混在草稿中不可见（如 before 的 ch01_claim_002 同样断言 shift workers 依从性下降，无任何溯源） | verifier 逐条点名 4 处 partially_supported 并给出理由（如 claim_001："证据未明确… "；gate 产出 4 条 `gate_partially_supported_claim` warning） |
+| 门控结论 | 无（compat） | `pass_with_warnings`；TUI metadata "质量门控：通过但有 4 条警告" |
+| 导出产物 | 5 个（无 quality-report，issue `EXPORT_QUALITY_ARTIFACTS_MISSING`） | 6 个（含 `final/quality-report.md`，支持度/证据深度/风险表完整） |
+
+运行产物：`agent-output/real-before-after/run-before/`、`run-after/`（已核查不含任何密钥）。结论：真实模型（gpt-5.5）在 enhanced 流程下每条论断可溯源、过度声称被逐条标记，与 mock 结构对照的结论一致且更直观，供用户主观签字参考。
+
 ---
 
 ## 五、spec 7.4 验收总线
@@ -99,5 +119,7 @@ fast 模式覆盖：
 
 ## 六、遗留事项
 
-1. 真实 provider before/after 对照待用户提供 API key 并授权后补跑（步骤见确认请求文档）。
+1. ~~真实 provider before/after 对照待用户提供 API key 并授权后补跑~~ → 已于 2026-06-13 以 gpt-5.5 补跑完成（见 4.4 节）。
 2. 主观验收签字：`agent-output/request/QualityEngine-before-after-确认请求.md`。
+3. **模块 22 接线缺口（建议走《Bug修复》流程）**：TUI 的 WritingProgress 从未真正启动 `app.NewAgentRuntime`，Writer/Editor 无 LLM runner 实现，`docs/开发进度.md` 中模块 22「真实 Runtime 接入」的完成记录与代码不符。在补齐接线前，真实 provider 只能经 `tools/real-before-after` harness 驱动，无法从 TUI 端到端运行。
+4. 密钥卫生：用户提供的 newapi key 曾以明文写入工作区文件（已移除、未进 git），建议轮换。

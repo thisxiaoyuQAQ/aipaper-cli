@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "material_001",
+      "path": "cbt_insomnia.md",
+      "kind": "markdown",
+      "status": "parsed",
+      "parser": "markdown",
+      "degraded": false,
+      "output_text": "materials/extracted/material_001.md",
+      "output_meta": "materials/parsed/material_001.json"
+    },
+    {
+      "id": "material_002",
+      "path": "digital_sleep.md",
+      "kind": "markdown",
+      "status": "parsed",
+      "parser": "markdown",
+      "degraded": false,
+      "output_text": "materials/extracted/material_002.md",
+      "output_meta": "materials/parsed/material_002.json"
+    },
+    {
+      "id": "material_003",
+      "path": "refs.bib",
+      "kind": "bibtex",
+      "status": "parsed",
+      "parser": "bibtex",
+      "degraded": false,
+      "output_text": "materials/extracted/material_003.md",
+      "output_meta": "materials/parsed/material_003.json"
+    }
+  ]
+}

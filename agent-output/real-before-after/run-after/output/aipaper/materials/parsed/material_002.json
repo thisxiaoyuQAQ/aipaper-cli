@@ -1,0 +1,15 @@
+{
+  "id": "material_002",
+  "source_path": "digital_sleep.md",
+  "kind": "markdown",
+  "parser": "markdown",
+  "degraded": false,
+  "chunks": [
+    {
+      "id": "material_002_chunk_001",
+      "start": 0,
+      "end": 247,
+      "text": "# Digital Sleep Interventions: Review Notes\r\n\r\nApp delivered sleep programs reproduce parts of therapist guided protocols.\r\nReported effect sizes vary widely across studies, and most trials are short, so durability claims need stronger evidence.\r\n"
+    }
+  ]
+}

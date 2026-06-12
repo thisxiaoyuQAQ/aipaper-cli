@@ -1,0 +1,54 @@
+{
+  "chapter_id": "ch02",
+  "draft_version": 1,
+  "claims": [
+    {
+      "id": "ch02_claim_001",
+      "text": "App-delivered sleep programs reproduce selected components of therapist-guided protocols and may retain partial efficacy for insomnia-related outcomes.",
+      "importance": "high",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "confidence": 0.78
+    },
+    {
+      "id": "ch02_claim_002",
+      "text": "Reported effect sizes for digital sleep therapy vary widely across studies, limiting confidence in consistent efficacy across platforms.",
+      "importance": "high",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "confidence": 0.82
+    },
+    {
+      "id": "ch02_claim_003",
+      "text": "Most trials of digital sleep interventions are short, so current evidence does not support strong conclusions about long-term durability.",
+      "importance": "high",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "confidence": 0.84
+    },
+    {
+      "id": "ch02_claim_004",
+      "text": "Digital sleep therapy is best characterized as a promising but heterogeneous delivery model rather than a uniformly effective replacement for therapist-guided CBT-I.",
+      "importance": "medium",
+      "reference_keys": [
+        "garcia2023DigitalDeliverySleep"
+      ],
+      "evidence_ids": [
+        "ev_002"
+      ],
+      "confidence": 0.7
+    }
+  ]
+}

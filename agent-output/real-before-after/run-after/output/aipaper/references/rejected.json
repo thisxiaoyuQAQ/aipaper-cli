@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "id": "cand_003",
+      "title": "Sleep Tracking Wearables",
+      "authors": [
+        "Lee, Min"
+      ],
+      "year": 2025,
+      "source": "bibtex",
+      "doi": "10.1000/wearables-sleep",
+      "abstract": "Consumer wearables estimate sleep stages with mixed accuracy. This entry stays unconfirmed in the quality-mini fixture.",
+      "dedupe_group": "doi:10.1000/wearables-sleep",
+      "status": "rejected"
+    }
+  ]
+}

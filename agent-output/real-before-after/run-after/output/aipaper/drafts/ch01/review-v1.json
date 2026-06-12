@@ -1,0 +1,15 @@
+{
+  "chapter_id": "ch01",
+  "draft_version": 1,
+  "scores": {
+    "overall": 86,
+    "citation_consistency": 94,
+    "structure_logic": 86,
+    "coverage": 86,
+    "readability": 86
+  },
+  "passed": true,
+  "unsupported_claims": [],
+  "required_fixes": [],
+  "optional_fixes": []
+}

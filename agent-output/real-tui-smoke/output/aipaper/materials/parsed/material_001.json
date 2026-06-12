@@ -1,0 +1,15 @@
+{
+  "id": "material_001",
+  "source_path": "cbt_insomnia.md",
+  "kind": "markdown",
+  "parser": "markdown",
+  "degraded": false,
+  "chunks": [
+    {
+      "id": "material_001_chunk_001",
+      "start": 0,
+      "end": 430,
+      "text": "# Cognitive Behavioral Therapy for Insomnia: Trial Notes\r\n\r\nCognitive behavioral therapy for insomnia (CBT-I) improved sleep onset latency in a randomized trial of 120 adults.\r\nThe effect persisted at six month follow up, although adherence declined for participants with shift work schedules.\r\nThe authors caution that the sample excluded patients with comorbid depression, so generalization beyond primary insomnia is limited.\r\n"
+    }
+  ]
+}

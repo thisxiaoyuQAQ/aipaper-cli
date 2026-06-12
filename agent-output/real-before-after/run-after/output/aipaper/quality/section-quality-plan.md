@@ -1,36 +1,37 @@
 # Section Quality Plan
 
-- Generated at: 2026-06-12T16:35:06Z
+- Generated at: 2026-06-12T18:03:39Z
 
 ## ch01
 
 - Questions:
-  - What sleep outcomes does therapist guided CBT-I improve in adults, and how durable are these effects over follow-up?
-  - How should exclusions of comorbid depression shape interpretation of therapist guided CBT-I findings?
+  - What does the available RCT evidence suggest about therapist guided CBT-I effects on sleep onset latency in adults?
+  - How durable are reported CBT-I outcomes over follow-up?
+  - 
 - Required evidence:
   - ev_001
 - Boundaries:
-  - Evidence supports improved sleep onset latency in an RCT of 120 adults with persistence to six months.
-  - Evidence cannot support conclusions about patients with comorbid depression because they were excluded.
-  - Evidence cannot support broad claims about all insomnia symptoms, all adult subgroups, or longer-term durability beyond six months.
+  - Evidence is limited to an abstract-level report of an RCT of 120 adults.
+  - Findings support improvement in sleep onset latency and persistence to six months only as described.
+  - Evidence cannot support conclusions for patients with comorbid depression because they were excluded.
 - Forbidden generalizations:
-  - Do not claim therapist guided CBT-I is effective for all insomnia patients.
-  - Do not claim benefit for comorbid depression populations.
-  - Do not claim indefinite or long-term persistence beyond the reported six months.
+  - Do not claim therapist guided CBT-I is effective for all insomnia populations.
+  - Do not generalize results to comorbid depression or other psychiatric conditions.
+  - Do not infer effects on outcomes not specified, such as total sleep time, daytime functioning, medication use, or relapse rates.
 
 ## ch02
 
 - Questions:
-  - What does current evidence suggest about the efficacy of app delivered sleep therapy programs?
-  - What limitations in trial duration and effect size consistency should be highlighted for digital delivery of sleep therapy?
+  - What does snippet-level evidence indicate about the efficacy of app-delivered sleep therapy programs?
+  - What limitations affect interpretation of digital sleep therapy trial results?
 - Required evidence:
   - ev_002
 - Boundaries:
-  - Evidence supports only partial efficacy for app delivered programs, with widely varying effect sizes.
-  - Evidence is limited by snippet-level depth and mostly short trials.
-  - Evidence cannot support strong conclusions about long-term effectiveness, comparative superiority to therapist guided CBT-I, or consistent efficacy across all digital sleep therapy platforms.
+  - Evidence is snippet-level and supports only cautious statements about partial efficacy.
+  - Effect sizes vary widely, so no single pooled magnitude should be asserted.
+  - Most trials are short, so long-term durability cannot be established from this evidence.
 - Forbidden generalizations:
-  - Do not claim digital sleep therapy is uniformly effective.
-  - Do not claim stable long-term outcomes from mostly short trials.
-  - Do not claim all app based programs perform similarly.
+  - Do not claim digital sleep therapy is equivalent to therapist guided CBT-I.
+  - Do not claim durable long-term efficacy for app-delivered programs.
+  - Do not generalize across all digital platforms, clinical populations, or delivery models.
 

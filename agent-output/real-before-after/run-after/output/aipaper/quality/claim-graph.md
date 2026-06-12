@@ -1,103 +1,103 @@
 # Claim Graph
 
-- Updated at: 2026-06-12T16:35:52Z
+- Updated at: 2026-06-12T18:04:34Z
 
 ## claim_001
 
 - Chapter: ch01
 - Source claim: ch01_claim_001
-- Text: Therapist guided CBT-I improved sleep onset latency in a randomized trial of 120 adults.
+- Text: Therapist guided CBT-I has randomized trial evidence suggesting benefit for adults with primary insomnia, particularly for sleep onset latency.
 - References: chen2024CbtIOutcomes
 - Evidence: ev_001
 - Support: partially_supported
-- Risk level: low
-- Verifier note: Evidence supports improved sleep onset latency in a randomized trial of 120 adults, but the provided evidence text does not explicitly identify the intervention as therapist-guided CBT-I.
+- Risk level: medium
+- Verifier note: Evidence supports an RCT in 120 adults showing improved sleep onset latency with persistence to six months, but the abstract summary does not explicitly establish that the sample was adults with primary insomnia; it only notes exclusion of comorbid depression.
 
 ## claim_002
 
 - Chapter: ch01
 - Source claim: ch01_claim_002
-- Text: The improvement in sleep onset latency persisted at six-month follow-up.
+- Text: In an RCT of 120 adults, CBT-I improved sleep onset latency, indicating that structured therapist delivered protocols may help patients fall asleep more quickly.
 - References: chen2024CbtIOutcomes
 - Evidence: ev_001
 - Support: supported
 - Risk level: low
-- Verifier note: Evidence explicitly states that the effect persisted at six-month follow-up.
+- Verifier note: The claim closely matches the evidence: an RCT of 120 adults found improved sleep onset latency, supporting the cautious conclusion that structured therapist-delivered CBT-I may help patients fall asleep faster.
 
 ## claim_003
 
 - Chapter: ch01
 - Source claim: ch01_claim_003
-- Text: The evidence supports conclusions about sleep initiation but not broad improvement across all insomnia symptoms or adult subgroups.
+- Text: Reported CBT-I gains persisted at six-month follow-up, suggesting medium-term durability but not proving maintenance beyond six months.
 - References: chen2024CbtIOutcomes
 - Evidence: ev_001
-- Support: partially_supported
-- Risk level: medium
-- Verifier note: Evidence supports conclusions about sleep onset latency and notes exclusion of comorbid depression, but it does not fully establish limitations across all insomnia symptoms or all adult subgroups beyond that exclusion.
+- Support: supported
+- Risk level: low
+- Verifier note: The evidence states the effect persisted at six-month follow-up, and the claim appropriately limits durability conclusions to medium term without asserting maintenance beyond six months.
 
 ## claim_004
 
 - Chapter: ch01
 - Source claim: ch01_claim_004
-- Text: Because patients with comorbid depression were excluded, findings should not be generalized to insomnia with comorbid depression.
+- Text: Because the trial excluded patients with comorbid depression, the findings should not be generalized to insomnia accompanied by depression or other psychiatric conditions.
 - References: chen2024CbtIOutcomes
 - Evidence: ev_001
-- Support: supported
+- Support: partially_supported
 - Risk level: medium
-- Verifier note: Evidence states that patients with comorbid depression were excluded, supporting caution against generalizing findings to insomnia with comorbid depression.
+- Verifier note: The evidence supports caution about generalizing to patients with comorbid depression because they were excluded. However, extending this caution to other psychiatric conditions is not directly supported by the provided evidence.
 
 ## claim_005
 
 - Chapter: ch01
 - Source claim: ch01_claim_005
-- Text: Durability should be limited to the observed six-month follow-up, without claims of longer-term persistence.
+- Text: Overall, therapist guided CBT-I appears promising for reducing sleep onset latency in the studied adult sample, but stronger conclusions require fuller reporting and broader inclusion criteria.
 - References: chen2024CbtIOutcomes
 - Evidence: ev_001
 - Support: supported
 - Risk level: low
-- Verifier note: Evidence reports persistence only at six-month follow-up, so limiting durability claims to that observed interval is supported.
+- Verifier note: The claim is appropriately cautious: the evidence supports benefit for sleep onset latency in the studied adult sample, while the abstract-only depth and exclusion of comorbid depression justify caution about stronger conclusions and broader inclusion.
 
 ## claim_006
 
 - Chapter: ch02
 - Source claim: ch02_claim_001
-- Text: App-delivered sleep programs reproduce selected components of therapist-guided protocols and may retain partial efficacy for insomnia-related outcomes.
+- Text: App-delivered sleep therapy programs reproduce selected components of therapist-guided insomnia protocols and may retain partial efficacy.
 - References: garcia2023DigitalDeliverySleep
 - Evidence: ev_002
 - Support: partially_supported
 - Risk level: medium
-- Verifier note: Evidence supports partial efficacy of app-delivered programs, but it does not state that these programs reproduce selected components of therapist-guided protocols.
+- Verifier note: The evidence supports that app-delivered programs may retain partial efficacy, but it does not explicitly state that they reproduce selected components of therapist-guided insomnia protocols.
 
 ## claim_007
 
 - Chapter: ch02
 - Source claim: ch02_claim_002
-- Text: Reported effect sizes for digital sleep therapy vary widely across studies, limiting confidence in consistent efficacy across platforms.
+- Text: Reported effect sizes for digital sleep interventions vary widely, so a single pooled magnitude of benefit should not be asserted from the available snippet-level evidence.
 - References: garcia2023DigitalDeliverySleep
 - Evidence: ev_002
 - Support: supported
-- Risk level: medium
-- Verifier note: Evidence explicitly states that effect sizes vary widely, which supports reduced confidence in consistent efficacy across platforms.
+- Risk level: low
+- Verifier note: The evidence directly states that effect sizes vary widely, supporting the claim that a single pooled magnitude should not be asserted from snippet-level evidence.
 
 ## claim_008
 
 - Chapter: ch02
 - Source claim: ch02_claim_003
-- Text: Most trials of digital sleep interventions are short, so current evidence does not support strong conclusions about long-term durability.
+- Text: Because most trials are short, current evidence does not establish durable long-term efficacy for app-delivered sleep therapy programs.
 - References: garcia2023DigitalDeliverySleep
 - Evidence: ev_002
 - Support: supported
-- Risk level: medium
-- Verifier note: Evidence states that most trials are short, supporting the conclusion that strong claims about long-term durability are not warranted.
+- Risk level: low
+- Verifier note: The evidence states that most trials are short, which supports the cautious conclusion that durable long-term efficacy is not established.
 
 ## claim_009
 
 - Chapter: ch02
 - Source claim: ch02_claim_004
-- Text: Digital sleep therapy is best characterized as a promising but heterogeneous delivery model rather than a uniformly effective replacement for therapist-guided CBT-I.
+- Text: Current evidence should be interpreted as potential but incomplete support for app-delivered sleep therapy, not as evidence of equivalence to therapist-guided CBT-I across platforms or populations.
 - References: garcia2023DigitalDeliverySleep
 - Evidence: ev_002
-- Support: partially_supported
-- Risk level: medium
-- Verifier note: Evidence supports that digital sleep therapy has partial efficacy and heterogeneous effects, but it does not directly compare it with therapist-guided CBT-I as a replacement.
+- Support: supported
+- Risk level: low
+- Verifier note: The evidence indicates partial efficacy, variable effect sizes, and short trials, supporting an interpretation of potential but incomplete evidence rather than equivalence to therapist-guided CBT-I across platforms or populations.
 

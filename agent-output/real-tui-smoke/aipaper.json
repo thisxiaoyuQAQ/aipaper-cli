@@ -1,0 +1,11 @@
+{
+  "provider": "custom",
+  "model": "gpt-5.5",
+  "providers": {
+    "custom": {
+      "type": "openai",
+      "api_key": "env:SMOKE_API_KEY",
+      "base_url": "https://api.smmmc.cn/v1"
+    }
+  }
+}

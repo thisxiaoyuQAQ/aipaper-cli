@@ -1,1 +1,1 @@
-Chapter is 145 words, uses only confirmed reference keys, and emphasizes efficacy, durability, adherence limitations, and cautious comparison with digital delivery.
+Chapter is 137 words excluding the heading. Citations use only confirmed reference keys and emphasize efficacy, durability, adherence limitations, and generalizability constraints.

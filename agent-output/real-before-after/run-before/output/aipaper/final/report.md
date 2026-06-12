@@ -1,7 +1,7 @@
 # Export Report
 
-- Export version: `export-20260612T163458Z`
-- Generated at: `2026-06-12T16:34:58Z`
+- Export version: `export-20260612T180331Z`
+- Generated at: `2026-06-12T18:03:31Z`
 - Overwrite strategy: final artifacts are overwritten on each export; chapter artifacts are not modified.
 - Markdown: `final/paper.md`
 - Docx: `final/paper.docx`

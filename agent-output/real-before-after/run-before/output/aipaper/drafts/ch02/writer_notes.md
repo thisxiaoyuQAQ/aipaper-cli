@@ -1,1 +1,1 @@
-Chapter length is approximately 146 words. Citations use only confirmed reference keys. Claims emphasize scalability, partial efficacy, variability, adherence, and the need for longer-term evidence.
+Kept citations limited to confirmed keys. Emphasized cautious interpretation because digital trials are often short, effect sizes vary, and CBT-I generalizability is limited by exclusion of comorbid depression in the source trial.

@@ -4,7 +4,7 @@
   "claims": [
     {
       "id": "ch02_claim_001",
-      "text": "App-delivered sleep therapy reproduces selected elements of therapist-guided CBT-I and can retain partial efficacy, but it may lack individualization and accountability.",
+      "text": "App-delivered sleep programs commonly reproduce selected components of therapist-guided CBT-I but may offer less individualized feedback.",
       "importance": "high",
       "reference_keys": [
         "garcia2023DigitalDeliverySleep"
@@ -13,7 +13,7 @@
     },
     {
       "id": "ch02_claim_002",
-      "text": "Reported effects of digital sleep interventions vary widely across studies, limiting strong conclusions about durability.",
+      "text": "Digital sleep therapy appears to retain partial efficacy compared with therapist-guided protocols, although reported effects vary across studies.",
       "importance": "high",
       "reference_keys": [
         "garcia2023DigitalDeliverySleep"
@@ -22,7 +22,7 @@
     },
     {
       "id": "ch02_claim_003",
-      "text": "Structured CBT-I improves sleep onset latency in adults, with benefits observed at six-month follow-up, although adherence may decline among shift workers.",
+      "text": "CBT-I trial evidence shows improved sleep onset latency with benefits persisting at six-month follow-up.",
       "importance": "medium",
       "reference_keys": [
         "chen2024CbtIOutcomes"
@@ -31,13 +31,13 @@
     },
     {
       "id": "ch02_claim_004",
-      "text": "Digital sleep therapy is best understood as a scalable delivery model that requires longer trials and better adherence reporting before equivalence to therapist-guided care can be assumed.",
-      "importance": "high",
+      "text": "Durability and adherence are key uncertainties for digital sleep interventions, particularly when schedules are irregular or follow-up is brief.",
+      "importance": "medium",
       "reference_keys": [
-        "garcia2023DigitalDeliverySleep",
-        "chen2024CbtIOutcomes"
+        "chen2024CbtIOutcomes",
+        "garcia2023DigitalDeliverySleep"
       ],
-      "confidence": 0.8
+      "confidence": 0.78
     }
   ]
 }

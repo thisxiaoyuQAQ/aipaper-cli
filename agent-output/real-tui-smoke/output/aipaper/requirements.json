@@ -1,0 +1,15 @@
+{
+  "topic": "Behavioral and digital treatment of insomnia",
+  "research_questions": [
+    "How durable are CBT-I effects across delivery modes?"
+  ],
+  "scope": "short mini review, two chapters",
+  "language": "en",
+  "citation_style": "APA",
+  "quality_mode": "enhanced",
+  "target_words": 300,
+  "material_dir": "fixtures/quality-mini/materials",
+  "allow_online_search": false,
+  "chapter_preferences": null,
+  "constraints": null
+}

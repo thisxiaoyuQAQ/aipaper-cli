@@ -1,7 +1,7 @@
 # Export Report
 
-- Export version: `export-20260612T163552Z`
-- Generated at: `2026-06-12T16:35:52Z`
+- Export version: `export-20260612T180434Z`
+- Generated at: `2026-06-12T18:04:34Z`
 - Overwrite strategy: final artifacts are overwritten on each export; chapter artifacts are not modified.
 - Markdown: `final/paper.md`
 - Docx: `final/paper.docx`
@@ -13,14 +13,14 @@
 
 - Mode: `enhanced`
 - Gate conclusion: `pass_with_warnings`
-- Risk findings: 4
+- Risk findings: 3
 - Full quality report: `final/quality-report.md`
 
 ## Quality Summary
 
 - Mode: `enhanced`
 - Gate conclusion: `pass_with_warnings`
-- Risk findings: 4
+- Risk findings: 3
 - Full quality report: `final/quality-report.md`
 
 ## Chapter Review Summary

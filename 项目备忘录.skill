@@ -90,7 +90,7 @@
 - `internal/tui/app/root.go` 中 References 桥接（newReferencesModel、updateReferences）已稳定
 - `internal/tui/writing/`：WritingProgress 四区布局、RuntimeEvent 桥接、model/view/events 已稳定；两阶段停止（stopping→checkpoint saved→canceled）已稳定；真实 runtime 接入在边界扩展，不修改核心逻辑
 - `internal/tui/app/recover_prompt.go`：RecoverPrompt 继续/重开/退出交互、重开二次确认已稳定
-- `internal/tui/app/root.go` 中退出确认（exitConfirm）和 RuntimeStopRequestedMsg 转发已稳定；真实 runtime stop adapter 已随模块 22 补齐
+- `internal/tui/app/root.go` 中退出确认（exitConfirm）和 RuntimeStopRequestedMsg 转发已稳定；真实 runtime stop adapter 经 BUG-20260613-01 于 2026-06-13 补实（模块 22 原记录失实）
 - `internal/tui/exportsummary/`：ExportSummary model/view、复用 export.LoadInput/ExportFinal、依赖注入（Export/DocxExporter/Now）、错误处理（CodeNoAcceptedChapters/CodeUnconfirmedReference/CodeDocxFailed）已稳定
 - `internal/tui/done/`：Done 完成页 model、Result 注入、输出目录/文件列表/命令提示已稳定
 - `internal/e2e/tui_flow_test.go`：TUI mock 全流程状态契约、SearchProgress→References RootModel 转场、ConfigWizard runtime role 解析、文档一致性验收已稳定
@@ -103,7 +103,7 @@
 - `internal/export/quality_report.go` 与 `internal/export` 质量集成：`QualityInput` 自动加载（缺失即兼容模式）、`RenderQualityReport` 五节结构、质量报告失败不阻塞 paper.md/docx、`Result.Metadata["quality_conclusion"]` 按章计数已稳定；不应改变兼容模式语义
 - `internal/tui/app/state_probe.go` 质量探测、`recover_prompt.go` 模式文案、`internal/tui/exportsummary` 质量摘要行、`internal/tui/requirements` quality_mode 三档：模块 30 边界扩展已稳定，后续只桥接不重写
 - `fixtures/quality-mini/` 与 `internal/e2e/quality_mini_test.go`、`internal/e2e/before_after_test.go`：模块 31 三层验收契约（硬阻断、三档矩阵、跨章重复、重写超限、before/after 结构对照），不应无故删除或放宽断言
-- `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；模块 22 已补齐真实 runtime 接入、stop adapter、真实 provider smoke 与 Windows 本机验收记录
+- `docs/全量验收报告.md` 中 TUI 增量验收记录：自动化验收通过；模块 22 原"已补齐"记录失实，真实 runtime 接入/stop adapter/恢复注入经 BUG-20260613-01 于 2026-06-13 落代码补实（见验收报告 9.4 更正记录），真实 provider 冒烟待 SMOKE_API_KEY
 
 ## 分支策略
 

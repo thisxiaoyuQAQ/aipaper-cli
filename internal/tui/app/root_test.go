@@ -401,8 +401,10 @@ func TestRootModelRecoverPromptContinueTransitionsToWriting(t *testing.T) {
 	model.RecoverPrompt = NewRecoverPromptModel(model.Probe)
 
 	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd != nil {
-		t.Fatalf("cmd = %v, want nil", cmd)
+	if cmd == nil {
+		// Module-22 bugfix: entering the writing screen must start the real
+		// runtime, so the transition now returns a non-nil command.
+		t.Fatalf("cmd = nil, want writing runtime start command")
 	}
 	root := updated.(RootModel)
 	if root.CurrentScreen != ScreenWriting {

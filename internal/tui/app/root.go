@@ -49,6 +49,9 @@ type RootOptions struct {
 	InitialScreen Screen
 	StateProbe    StateProbeFunc
 	Recover       func(string) (runtimeapp.RecoveryResult, error)
+	// RuntimeStarter launches the real writing runtime when the writing
+	// screen starts; nil uses StartWritingRuntime (module-22 bugfix wiring).
+	RuntimeStarter WritingRuntimeStarter
 }
 
 type RootModel struct {
@@ -67,6 +70,10 @@ type RootModel struct {
 	Probe         ProbeResult
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
+	// Real writing runtime (module-22 bugfix wiring)
+	runtimeStarter WritingRuntimeStarter
+	runtime        *WritingRuntime
+
 	// Exit confirmation state
 	exitConfirm       bool
 	exitConfirmScreen Screen
@@ -83,9 +90,10 @@ func NewRootModel(opts RootOptions) RootModel {
 		recoverFn = runtimeapp.Recover
 	}
 	m := RootModel{
-		WorkDir:      opts.WorkDir,
-		ConfigWizard: configwizard.NewModel(configwizard.Options{WorkDir: opts.WorkDir}),
-		recover:      recoverFn,
+		WorkDir:        opts.WorkDir,
+		ConfigWizard:   configwizard.NewModel(configwizard.Options{WorkDir: opts.WorkDir}),
+		recover:        recoverFn,
+		runtimeStarter: opts.RuntimeStarter,
 	}
 
 	screen := opts.InitialScreen
@@ -187,7 +195,7 @@ func (m RootModel) Init() tea.Cmd {
 		if m.err != nil {
 			return nil
 		}
-		return m.Writing.Init()
+		return tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 	}
 	if m.CurrentScreen == ScreenExportSummary {
 		return m.ExportSummary.Init()
@@ -263,7 +271,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.Next == ScreenWriting {
 			m.Writing = writingModel
-			return m, m.Writing.Init()
+			return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 		}
 		if msg.Next == ScreenExportSummary {
 			m.ExportSummary = newExportSummaryModel(m.WorkDir)
@@ -285,13 +293,42 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = m.Search.Err()
 			return m, nil
 		}
-	case writingtui.RuntimeStopRequestedMsg:
-		// Forward stop request to writing model if in writing screen
+	case writingRuntimeStartedMsg:
+		// Module-22 bugfix wiring: the real runtime started (or failed to).
+		if msg.err != nil {
+			updated, _ := m.Writing.Update(writingtui.RuntimeDoneMsg{Error: msg.err})
+			if writingModel, ok := updated.(writingtui.Model); ok {
+				m.Writing = writingModel
+			}
+			m.err = msg.err
+			return m, nil
+		}
+		m.runtime = msg.runtime
+		return m, m.runtime.NextEventCmd()
+	case writingtui.RuntimeEventMsg:
 		if m.CurrentScreen == ScreenWriting {
 			updated, _ := m.Writing.Update(msg)
 			if writingModel, ok := updated.(writingtui.Model); ok {
 				m.Writing = writingModel
 			}
+		}
+		return m, m.runtime.NextEventCmd()
+	case writingtui.RuntimeDoneMsg:
+		if m.CurrentScreen == ScreenWriting {
+			updated, _ := m.Writing.Update(msg)
+			if writingModel, ok := updated.(writingtui.Model); ok {
+				m.Writing = writingModel
+			}
+		}
+		return m, nil
+	case writingtui.RuntimeStopRequestedMsg:
+		// Forward stop request to writing model and abort the real runtime
+		if m.CurrentScreen == ScreenWriting {
+			updated, _ := m.Writing.Update(msg)
+			if writingModel, ok := updated.(writingtui.Model); ok {
+				m.Writing = writingModel
+			}
+			m.runtime.Stop()
 			return m, nil
 		}
 	case tea.KeyMsg:
@@ -339,7 +376,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ScreenData = WritingResumeData{Recovery: result, RecoveryPrompt: result.RecoveryPrompt}
 				m.Writing = newWritingModel(m.WorkDir, m.ScreenData)
 				m.err = nil
-				return m, m.Writing.Init()
+				return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 			case RecoverActionRestart:
 				m.CurrentScreen = ScreenRequirements
 				m.ScreenData = RecoverActionRestart
@@ -734,7 +771,7 @@ func (m RootModel) updateReferences(key string) (tea.Model, tea.Cmd) {
 		m.ScreenData = result
 		m.Writing = newWritingModel(m.WorkDir, result)
 		m.err = nil
-		return m, m.Writing.Init()
+		return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 	}
 
 	return m, nil
@@ -755,11 +792,30 @@ func newWritingModel(workDir string, data any) writingtui.Model {
 	return writingtui.NewModel(opts)
 }
 
+// startWritingRuntimeCmd launches the real writing runtime in the background.
+// The recovery prompt comes from WritingResumeData when the screen entered via
+// the recovery path (B7).
+func (m RootModel) startWritingRuntimeCmd() tea.Cmd {
+	starter := m.runtimeStarter
+	if starter == nil {
+		starter = StartWritingRuntime
+	}
+	workDir := m.WorkDir
+	recoveryPrompt := ""
+	if resumeData, ok := m.ScreenData.(WritingResumeData); ok {
+		recoveryPrompt = resumeData.RecoveryPrompt
+	}
+	return func() tea.Msg {
+		rt, err := starter(workDir, recoveryPrompt)
+		return writingRuntimeStartedMsg{runtime: rt, err: err}
+	}
+}
+
 func (m RootModel) updateWriting(key string) (tea.Model, tea.Cmd) {
 	m.Writing = m.Writing.UpdateKey(key)
 	m.err = m.Writing.Err()
 
-	if m.Writing.Done() {
+	if m.Writing.Done() && m.Writing.Err() == nil {
 		// Writing completed, transition to ExportSummary and trigger export.
 		m.CurrentScreen = ScreenExportSummary
 		m.ScreenData = nil

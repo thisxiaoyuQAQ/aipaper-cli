@@ -39,6 +39,26 @@ func ProjectEvent(ev agentcore.Event, at time.Time) contracts.RunEvent {
 			fields["agent"] = ev.Progress.Agent
 		}
 	}
+	// Module-22 bugfix boundary extension: project streaming deltas and usage
+	// so the TUI bridge can render live output and token counters.
+	if ev.Type == agentcore.EventMessageUpdate && ev.Delta != "" && ev.DeltaKind == agentcore.DeltaText {
+		fields["delta"] = ev.Delta
+	}
+	if ev.Type == agentcore.EventMessageEnd {
+		if msg, ok := ev.Message.(agentcore.Message); ok && msg.Usage != nil {
+			fields["input_tokens"] = int64(msg.Usage.Input)
+			fields["output_tokens"] = int64(msg.Usage.Output)
+			if msg.Usage.TotalTokens > 0 {
+				fields["context_tokens"] = int64(msg.Usage.TotalTokens)
+			}
+			if msg.Usage.Model != "" {
+				fields["model"] = msg.Usage.Model
+			}
+			if msg.Usage.Cost != nil {
+				fields["cost_usd"] = msg.Usage.Cost.Total
+			}
+		}
+	}
 	message := eventMessage(ev)
 	if len(fields) == 1 {
 		fields = nil

@@ -110,18 +110,90 @@ func BridgeRunEvent(ev contracts.RunEvent) RuntimeEvent {
 		re.Kind = EventRuntimeDone
 	case "error":
 		re.Kind = EventRuntimeError
+	// Module-22 bugfix boundary extension: host-side runner events carry the
+	// writing event kinds directly (streaming deltas, usage, chapter status,
+	// checkpoint markers).
+	case string(EventContentDelta):
+		re.Kind = EventContentDelta
+		if delta, ok := ev.Fields["delta"].(string); ok {
+			re.Delta = delta
+		}
+	case string(EventUsageUpdate), "message_end":
+		re.Kind = EventUsageUpdate
+		re.Usage = usageFromFields(ev.Fields)
+	case string(EventChapterStatus):
+		re.Kind = EventChapterStatus
+	case string(EventCheckpointSaved):
+		re.Kind = EventCheckpointSaved
+	case string(EventQualityReview):
+		re.Kind = EventQualityReview
+	case string(EventExportArtifact):
+		re.Kind = EventExportArtifact
 	default:
 		re.Kind = EventRoleLog
 	}
 
-	// Extract role
+	// Extract role and chapter id
 	if ev.Fields != nil {
 		if agent, ok := ev.Fields["agent"].(string); ok {
 			re.Role = agent
 		}
+		if chapterID, ok := ev.Fields["chapter_id"].(string); ok {
+			re.ChapterID = chapterID
+		}
 	}
 
 	return re
+}
+
+// usageFromFields builds a UsageSnapshot from projected run-event fields.
+func usageFromFields(fields map[string]any) *UsageSnapshot {
+	if fields == nil {
+		return nil
+	}
+	usage := &UsageSnapshot{}
+	found := false
+	if v, ok := fieldInt64(fields, "input_tokens"); ok {
+		usage.InputTokens = &v
+		found = true
+	}
+	if v, ok := fieldInt64(fields, "output_tokens"); ok {
+		usage.OutputTokens = &v
+		found = true
+	}
+	if v, ok := fieldInt64(fields, "context_tokens"); ok {
+		usage.ContextTokens = &v
+		found = true
+	}
+	if v, ok := fieldInt64(fields, "max_context_tokens"); ok {
+		usage.MaxContextTokens = &v
+		found = true
+	}
+	if v, ok := fields["cost_usd"].(float64); ok {
+		usage.CostUSD = &v
+		found = true
+	}
+	if v, ok := fields["model"].(string); ok && v != "" {
+		usage.Model = v
+		found = true
+	}
+	if !found {
+		return nil
+	}
+	return usage
+}
+
+func fieldInt64(fields map[string]any, key string) (int64, bool) {
+	switch v := fields[key].(type) {
+	case int64:
+		return v, true
+	case int:
+		return int64(v), true
+	case float64:
+		return int64(v), true
+	default:
+		return 0, false
+	}
 }
 
 // RuntimeEventMsg is a Bubble Tea message carrying a RuntimeEvent.

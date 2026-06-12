@@ -34,8 +34,12 @@ type AgentRuntimeOptions struct {
 	RecoveryPrompt string
 	Model          agentcore.ChatModel
 	Writer         aipagent.WriterRunner
-	EventSink      func(contracts.RunEvent)
-	Now            func() time.Time
+	// Architect and Editor are the module-22 bugfix role runners; nil keeps
+	// the structured not-implemented stub of the corresponding tool.
+	Architect aipagent.ArchitectRunner
+	Editor    aipagent.EditorRunner
+	EventSink func(contracts.RunEvent)
+	Now       func() time.Time
 }
 
 type RoleRuntimeConfig struct {
@@ -63,7 +67,7 @@ func NewAgentRuntime(opts AgentRuntimeOptions) (*AgentRuntime, error) {
 	}
 
 	s := store.New(opts.WorkDir)
-	tools := aipagent.DefaultTools(s, opts.Writer)
+	tools := aipagent.RoleTools(s, opts.Writer, opts.Architect, opts.Editor)
 	systemPrompt := aipagent.CoordinatorSystemPrompt(aipagent.PromptOptions{RecoveryPrompt: opts.RecoveryPrompt})
 	agent := agentcore.NewAgent(
 		agentcore.WithModel(model),

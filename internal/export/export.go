@@ -12,6 +12,7 @@ import (
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/artifacts"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/checkpoint"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	qualitypkg "github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -351,14 +352,33 @@ func buildQualityConclusion(quality QualityInput) string {
 	case "pass_with_warnings":
 		return fmt.Sprintf("质量门控：通过但有 %d 条警告", findingCount)
 	case "needs_revision":
-		return fmt.Sprintf("质量门控：%d 章需要修订", findingCount)
+		return fmt.Sprintf("质量门控：%d 章需要修订", chaptersAtSeverity(quality.GateOutcome.Findings, "needs_revision"))
 	case "needs_human_review":
-		return fmt.Sprintf("质量门控：%d 章需要人工复核", findingCount)
+		return fmt.Sprintf("质量门控：%d 章需要人工复核", chaptersAtSeverity(quality.GateOutcome.Findings, "needs_human_review"))
 	case "blocked":
 		return fmt.Sprintf("质量门控：已阻断（%d 条硬门槛问题）", blockerCount)
 	default:
 		return fmt.Sprintf("质量门控：%s", conclusion)
 	}
+}
+
+// chaptersAtSeverity counts the distinct chapters carrying findings of the
+// given severity, so the conclusion line reports chapters rather than raw
+// finding counts. Findings without a chapter id (defensive) count as one each.
+func chaptersAtSeverity(findings []qualitypkg.GateIssue, severity string) int {
+	chapters := map[string]bool{}
+	orphans := 0
+	for _, finding := range findings {
+		if finding.Severity != severity {
+			continue
+		}
+		if finding.ChapterID == "" {
+			orphans++
+			continue
+		}
+		chapters[finding.ChapterID] = true
+	}
+	return len(chapters) + orphans
 }
 
 func referenceMap(confirmed contracts.ConfirmedReferences) map[string]contracts.ConfirmedReference {

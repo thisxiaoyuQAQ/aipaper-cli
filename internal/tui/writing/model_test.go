@@ -429,3 +429,45 @@ func TestBridgeRunEvent(t *testing.T) {
 		})
 	}
 }
+
+func TestStaleHintHiddenWhileActive(t *testing.T) {
+	m := NewModel(Options{Width: 120, Height: 40})
+	m.running = true
+	if h := m.staleHint(); h != "" {
+		t.Fatalf("staleHint should be empty right after creation, got %q", h)
+	}
+}
+
+func TestStaleHintShownWhenIdle(t *testing.T) {
+	m := NewModel(Options{Width: 120, Height: 40})
+	m.running = true
+	// Force lastActivity beyond the threshold.
+	m.lastActivity = time.Now().Add(-(staleThreshold + 5*time.Second))
+	h := m.staleHint()
+	if h == "" {
+		t.Fatal("staleHint should fire after exceeding the threshold while running")
+	}
+}
+
+func TestStaleHintSuppressedWhenDone(t *testing.T) {
+	m := NewModel(Options{Width: 120, Height: 40})
+	m.running = true
+	m.done = true
+	m.lastActivity = time.Now().Add(-(staleThreshold + 5*time.Second))
+	if h := m.staleHint(); h != "" {
+		t.Fatalf("staleHint should be suppressed when done, got %q", h)
+	}
+}
+
+func TestStaleHintResetsOnEvent(t *testing.T) {
+	m := NewModel(Options{Width: 120, Height: 40})
+	m.running = true
+	m.lastActivity = time.Now().Add(-(staleThreshold + 5*time.Second))
+	if m.staleHint() == "" {
+		t.Fatal("precondition: should be stale before event")
+	}
+	m.handleRuntimeEvent(RuntimeEvent{At: time.Now(), Kind: EventRoleLog, Role: "system", Message: "tick"})
+	if h := m.staleHint(); h != "" {
+		t.Fatalf("staleHint should reset after an event, got %q", h)
+	}
+}

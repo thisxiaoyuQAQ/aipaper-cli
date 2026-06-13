@@ -31,6 +31,12 @@ import (
 // cannot spin forever. Each round allows up to the coordinator MaxTurns.
 const maxContinuationRounds = 30
 
+// heartbeatInterval is how often the watchdog emits a "still waiting" event
+// while the agent loop is blocked on a single WaitForIdle. It keeps the TUI
+// visibly alive even when the real LLM call hangs with no streaming deltas.
+// A var (not const) so tests can shorten the tick.
+var heartbeatInterval = 15 * time.Second
+
 // WritingRuntimeStarter launches the real runtime for the writing screen.
 // Injectable so tests can avoid provider config and goroutines.
 type WritingRuntimeStarter func(workDir, recoveryPrompt string) (*WritingRuntime, error)
@@ -49,6 +55,16 @@ type WritingRuntime struct {
 
 	stopRequested atomic.Bool
 	closeOnce     sync.Once
+
+	// diag records startup-chain nodes to output/aipaper/runtime.log so a
+	// real-run hang can be located after the fact. Nil = no logging.
+	diag *diagLogger
+
+	// heartbeatWG tracks the watchdog goroutine so Stop/run-exit can wait for
+	// it to release; heartbeatStop closes the watchdog.
+	heartbeatMu   sync.Mutex
+	heartbeatStop chan struct{}
+	heartbeatWG   sync.WaitGroup
 
 	// cumulative usage across coordinator and role runners
 	usageMu     sync.Mutex
@@ -72,7 +88,7 @@ func StartWritingRuntime(workDir, recoveryPrompt string) (*WritingRuntime, error
 		return nil, fmt.Errorf("provider and model are required to start the writing runtime; configure aipaper.json first")
 	}
 
-	rt := &WritingRuntime{msgs: make(chan tea.Msg, 512)}
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 512), diag: newFileDiagLogger(workDir)}
 	s := store.New(workDir)
 	sink := rt.makeSink()
 	runnerOpts := runtimeapp.RoleRunnerOptions{Config: cfg, Store: s, EventSink: sink}
@@ -103,6 +119,12 @@ func StartWritingRuntime(workDir, recoveryPrompt string) (*WritingRuntime, error
 	}
 	rt.agent = runtime.Agent
 	rt.model = runtime.Model
+
+	// Start signal BEFORE the goroutine: if the writing screen stays static
+	// after this, the run goroutine itself failed to launch (panic/blocked),
+	// which is otherwise invisible. resuming flags the recovery path.
+	rt.diag.logf("start writing runtime model=%s resuming=%v", rt.model, recoveryPrompt != "")
+	rt.sendEvent(rt.systemEvent("role_log", fmt.Sprintf("启动写作运行时（model=%s）", rt.model), nil))
 
 	go rt.run(workDir, recoveryPrompt)
 	return rt, nil
@@ -138,19 +160,27 @@ func (rt *WritingRuntime) Stop() {
 
 func (rt *WritingRuntime) run(workDir, recoveryPrompt string) {
 	defer rt.closeOnce.Do(func() { close(rt.msgs) })
+	defer rt.stopHeartbeat()
 
 	kickoff := buildKickoffPrompt(recoveryPrompt != "")
 	if err := rt.agent.Prompt(kickoff); err != nil {
+		rt.diag.logf("coordinator prompt failed: %v", err)
 		rt.msgs <- writingtui.RuntimeDoneMsg{Error: fmt.Errorf("start coordinator: %w", err)}
 		return
 	}
+	// Prompt returned nil: the run goroutine and the coordinator turn are
+	// launched. A hang hereafter means the real LLM call blocked with no
+	// streaming deltas — the watchdog below makes that visible.
+	rt.diag.logf("coordinator started")
+	rt.sendEvent(rt.systemEvent("role_log", "coordinator 已启动，开始写作流程", nil))
 
 	for round := 0; ; round++ {
-		rt.agent.WaitForIdle()
+		rt.waitForIdleWithHeartbeat(round)
 
 		if rt.stopRequested.Load() {
 			// Two-phase stop: report the safe state; the writing model marks
 			// itself canceled on checkpoint_saved while stopping.
+			rt.diag.logf("stop requested at round=%d", round)
 			rt.sendEvent(contracts.RunEvent{
 				At:      time.Now().UTC(),
 				Kind:    "checkpoint_saved",
@@ -162,6 +192,7 @@ func (rt *WritingRuntime) run(workDir, recoveryPrompt string) {
 
 		progress, ok, err := runtimeapp.LoadProgress(workDir)
 		if err == nil && ok && progress.Status == "completed" {
+			rt.diag.logf("progress completed at round=%d", round)
 			rt.msgs <- writingtui.RuntimeDoneMsg{Success: true}
 			return
 		}
@@ -169,6 +200,7 @@ func (rt *WritingRuntime) run(workDir, recoveryPrompt string) {
 		reason, _ := rt.endReason.Load().(agentcore.EndReason)
 		switch reason {
 		case agentcore.EndReasonAborted:
+			rt.diag.logf("run aborted at round=%d", round)
 			rt.sendEvent(contracts.RunEvent{
 				At:      time.Now().UTC(),
 				Kind:    "checkpoint_saved",
@@ -181,11 +213,13 @@ func (rt *WritingRuntime) run(workDir, recoveryPrompt string) {
 			if msg == "" {
 				msg = "coordinator run failed"
 			}
+			rt.diag.logf("run error at round=%d: %s", round, msg)
 			rt.msgs <- writingtui.RuntimeDoneMsg{Error: fmt.Errorf("%s", msg)}
 			return
 		}
 
 		if round >= maxContinuationRounds {
+			rt.diag.logf("round cap reached (%d)", maxContinuationRounds)
 			rt.msgs <- writingtui.RuntimeDoneMsg{Error: fmt.Errorf("writing did not complete within %d coordinator rounds; progress is saved at the last checkpoint", maxContinuationRounds)}
 			return
 		}
@@ -195,11 +229,81 @@ func (rt *WritingRuntime) run(workDir, recoveryPrompt string) {
 		// conversation context.
 		if err := rt.agent.Continue(); err != nil {
 			if err := rt.agent.Prompt(continuationPrompt); err != nil {
+				rt.diag.logf("continue failed at round=%d: %v", round, err)
 				rt.msgs <- writingtui.RuntimeDoneMsg{Error: fmt.Errorf("continue coordinator: %w", err)}
 				return
 			}
 		}
 	}
+}
+
+// waitForIdleWithHeartbeat blocks until the current agent turn finishes while a
+// watchdog emits periodic "still waiting" role_log events. If the real LLM
+// call hangs with no streaming deltas, the TUI still shows the round and how
+// long it has been blocked instead of freezing on a static screen.
+func (rt *WritingRuntime) waitForIdleWithHeartbeat(round int) {
+	idle := make(chan struct{})
+	rt.startHeartbeat(round, idle)
+	defer close(idle)
+	rt.agent.WaitForIdle()
+}
+
+// startHeartbeat launches a watchdog goroutine that ticks every heartbeatInterval
+// while the agent is blocked on WaitForIdle. It stops when idle is closed or the
+// runtime shuts down. startHeartbeat/stopHeartbeat are paired and re-entrant per
+// round via heartbeatMu.
+func (rt *WritingRuntime) startHeartbeat(round int, idle <-chan struct{}) {
+	rt.heartbeatMu.Lock()
+	defer rt.heartbeatMu.Unlock()
+	// Replace any prior ticker channel (defensive; rounds are sequential).
+	if rt.heartbeatStop != nil {
+		close(rt.heartbeatStop)
+		rt.heartbeatWG.Wait()
+	}
+	stop := make(chan struct{})
+	rt.heartbeatStop = stop
+	started := time.Now().UTC()
+	rt.heartbeatWG.Add(1)
+	go func() {
+		defer rt.heartbeatWG.Done()
+		ticker := time.NewTicker(heartbeatInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-idle:
+				return
+			case <-stop:
+				return
+			case <-ticker.C:
+				elapsed := time.Since(started).Round(time.Second)
+				rt.sendEvent(rt.systemEvent("role_log",
+					fmt.Sprintf("写作中… 已等待 %s（round=%d）", elapsed, round), nil))
+				rt.diag.logf("heartbeat round=%d elapsed=%s", round, elapsed)
+			}
+		}
+	}()
+}
+
+// stopHeartbeat tears down any active watchdog. Called on run exit.
+func (rt *WritingRuntime) stopHeartbeat() {
+	rt.heartbeatMu.Lock()
+	stop := rt.heartbeatStop
+	rt.heartbeatStop = nil
+	rt.heartbeatMu.Unlock()
+	if stop != nil {
+		close(stop)
+		rt.heartbeatWG.Wait()
+	}
+}
+
+// systemEvent builds a contracts.RunEvent with the system agent tag and a
+// fresh timestamp, merging optional extra fields.
+func (rt *WritingRuntime) systemEvent(kind, message string, extra map[string]any) contracts.RunEvent {
+	fields := map[string]any{"agent": "system"}
+	for k, v := range extra {
+		fields[k] = v
+	}
+	return contracts.RunEvent{At: time.Now().UTC(), Kind: kind, Message: message, Fields: fields}
 }
 
 // makeSink converts contracts.RunEvent into TUI messages. It filters the noisy

@@ -139,3 +139,85 @@ func TestLauncherSinkFiltersAndAccumulatesUsage(t *testing.T) {
 		t.Fatalf("endReason stored as string %q", reason)
 	}
 }
+
+// TestWritingRuntimeEmitsStartLog asserts the launcher sends a startup
+// role_log into the event channel so a static writing screen can be
+// attributed to the run goroutine (B) rather than the bridge. The runtime
+// is constructed directly (no network, no goroutine) and the sink's public
+// path is exercised via systemEvent + sendEvent, mirroring StartWritingRuntime.
+func TestWritingRuntimeEmitsStartLog(t *testing.T) {
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8)}
+	rt.sendEvent(rt.systemEvent("role_log", "启动写作运行时（model=test）", nil))
+
+	select {
+	case msg := <-rt.msgs:
+		ev, ok := msg.(writingtui.RuntimeEventMsg)
+		if !ok {
+			t.Fatalf("expected RuntimeEventMsg, got %T", msg)
+		}
+		if ev.Kind != writingtui.EventRoleLog {
+			t.Fatalf("kind = %q, want %q", ev.Kind, writingtui.EventRoleLog)
+		}
+		if ev.Message == "" {
+			t.Fatal("startup role_log message is empty")
+		}
+	default:
+		t.Fatal("no startup role_log on the channel")
+	}
+}
+
+// TestWritingRuntimeHeartbeatEmitsWhileIdle drives the watchdog directly with
+// a faked idle channel: it stays open long enough for one short tick, then the
+// goroutine stops cleanly. A real blocked WaitForIdle looks identical here.
+func TestWritingRuntimeHeartbeatEmitsWhileIdle(t *testing.T) {
+	prev := heartbeatInterval
+	heartbeatInterval = 10 * time.Millisecond
+	t.Cleanup(func() { heartbeatInterval = prev })
+
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8)}
+	idle := make(chan struct{})
+	rt.startHeartbeat(3, idle)
+
+	// One heartbeat should land quickly while idle stays open.
+	select {
+	case msg := <-rt.msgs:
+		ev, ok := msg.(writingtui.RuntimeEventMsg)
+		if !ok {
+			t.Fatalf("expected RuntimeEventMsg, got %T", msg)
+		}
+		if ev.Kind != writingtui.EventRoleLog {
+			t.Fatalf("kind = %q, want %q", ev.Kind, writingtui.EventRoleLog)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("heartbeat did not fire while idle")
+	}
+
+	close(idle)
+	rt.heartbeatWG.Wait() // goroutine must release without Stop()
+
+	// After idle closes no further heartbeats arrive.
+	rt.msgs = make(chan tea.Msg, 1) // reset for the drain check
+	select {
+	case msg := <-rt.msgs:
+		t.Fatalf("unexpected message after idle closed: %#v", msg)
+	case <-time.After(40 * time.Millisecond):
+	}
+}
+
+// TestWritingRuntimeStopHeartbeatTearsDown ensures Stop-style teardown waits
+// for the watchdog so the run goroutine can close the channel safely.
+func TestWritingRuntimeStopHeartbeatTearsDown(t *testing.T) {
+	prev := heartbeatInterval
+	heartbeatInterval = 10 * time.Millisecond
+	t.Cleanup(func() { heartbeatInterval = prev })
+
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8)}
+	idle := make(chan struct{})
+	rt.startHeartbeat(0, idle)
+
+	rt.stopHeartbeat()
+	rt.heartbeatWG.Wait() // must not block
+
+	// Stopping twice must be a no-op (safe on run-exit + Stop paths).
+	rt.stopHeartbeat()
+}

@@ -321,7 +321,34 @@ func (m Model) renderFooter() string {
 		"↑/↓: Scroll logs",
 	}
 
-	return footerStyle.Render(strings.Join(hints, " • "))
+	footer := strings.Join(hints, " • ")
+	if hint := m.staleHint(); hint != "" {
+		footer = hint + "\n" + footerStyle.Render(footer)
+		return footer
+	}
+
+	return footerStyle.Render(footer)
+}
+
+// staleHint returns a one-line warning when the screen has not received any
+// runtime event for longer than staleThreshold while still running. It is the
+// TUI backstop for cases the heartbeat watchdog does not cover (channel full
+// drop, events filtered out). Empty when not stale, done, or canceled.
+func (m Model) staleHint() string {
+	if !m.running || m.done || m.canceled {
+		return ""
+	}
+	if m.lastActivity.IsZero() {
+		return ""
+	}
+	since := time.Since(m.lastActivity)
+	if since < staleThreshold {
+		return ""
+	}
+	return logErrorStyle.Render(fmt.Sprintf(
+		"⚠️  已 %s 无更新，可能正在等待模型响应；Ctrl+C 可保存进度后退出",
+		formatDuration(since.Round(time.Second)),
+	))
 }
 
 // Helper rendering functions

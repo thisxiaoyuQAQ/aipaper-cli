@@ -7,6 +7,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// staleThreshold is how long the writing screen may go without any runtime
+// event before the footer shows a "no updates" hint. It complements the
+// launcher heartbeat: the heartbeat keeps the screen alive when the agent loop
+// blocks; this hint backstops the cases the heartbeat misses.
+const staleThreshold = 20 * time.Second
+
 // Model represents the WritingProgress screen state.
 type Model struct {
 	// Metrics
@@ -21,6 +27,7 @@ type Model struct {
 	totalCost     float64
 	startTime     time.Time
 	elapsed       time.Duration
+	lastActivity  time.Time // updated on every runtime event; drives the stale hint
 
 	// Logs (middle-top region)
 	logs          []logEntry
@@ -78,7 +85,7 @@ func NewModel(opts Options) Model {
 	}
 
 	return Model{
-		phase:           "Initializing",
+		phase:           "正在启动写作运行时…",
 		currentStep:     "",
 		totalProgress:   0.0,
 		wordCount:       0,
@@ -89,6 +96,7 @@ func NewModel(opts Options) Model {
 		totalCost:       0.0,
 		startTime:       time.Now(),
 		elapsed:         0,
+		lastActivity:    time.Now(),
 		logs:            []logEntry{},
 		maxLogs:         100,
 		autoScroll:      true,
@@ -203,6 +211,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleRuntimeEvent(ev RuntimeEvent) {
 	m.elapsed = time.Since(m.startTime)
+	m.lastActivity = time.Now()
 
 	switch ev.Kind {
 	case EventStepStarted:

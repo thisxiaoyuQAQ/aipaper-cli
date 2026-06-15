@@ -35,7 +35,7 @@ func TestExportFinalWritesMarkdownReferencesTraceReportAndDocx(t *testing.T) {
 		t.Fatalf("paper.md = %s", paper)
 	}
 	references := readFile(t, s.Path("final", "references.md"))
-	if !strings.Contains(references, "[smith2024Rag] Smith, Jane (2024). RAG for Reviews.") {
+	if !strings.Contains(references, "[1] Smith, Jane. RAG for Reviews[J]. Journal of Retrieval, 2024. DOI: 10.1000/rag.") {
 		t.Fatalf("references.md = %s", references)
 	}
 	report := readFile(t, s.Path("final", "report.md"))
@@ -105,6 +105,42 @@ func TestExportFinalRejectsUnconfirmedCitationTraceReference(t *testing.T) {
 	}
 }
 
+func TestRenderChapterMarkdownUsesParagraphIDsAndDedupesCitations(t *testing.T) {
+	input := sampleExportInput()
+	input.ConfirmedReferences.Items = append(input.ConfirmedReferences.Items, contracts.ConfirmedReference{
+		Key:         "doe2025Eval",
+		Title:       "Evaluation Methods",
+		Authors:     []string{"Doe, Jane"},
+		Year:        2025,
+		ConfirmedAt: time.Date(2026, 6, 7, 10, 0, 0, 0, time.UTC),
+	})
+	chapter := input.Chapters[0]
+	chapter.AcceptedMarkdown = "## Intro\n\nFirst paragraph.\n\nSecond paragraph already cites [smith2024Rag][doe2025Eval]."
+	chapter.CitationMap.Mappings = []contracts.CitationMapping{ // duplicate key should compress to [1-2], not [1,1-2]
+		{ParagraphID: "ch01_p002", ClaimIDs: []string{"ch01_claim_001"}, ReferenceKeys: []string{"smith2024Rag", "smith2024Rag", "doe2025Eval"}},
+	}
+
+	got := renderChapterMarkdown(chapter, buildReferenceNumbering(input))
+	if strings.Contains(got, "First paragraph.[") {
+		t.Fatalf("citation attached to wrong paragraph:\n%s", got)
+	}
+	if strings.Contains(got, "[1][2][1-2]") || strings.Contains(got, "[1,1-2]") {
+		t.Fatalf("citation duplicated instead of recognizing existing rendered keys:\n%s", got)
+	}
+	if !strings.Contains(got, "Second paragraph already cites [1][2].") {
+		t.Fatalf("citation keys were not rendered as expected:\n%s", got)
+	}
+}
+
+func TestRenderPaperMarkdownUsesEnglishReferencesHeadingForAPA(t *testing.T) {
+	input := sampleExportInput()
+	input.CitationStyle = "apa"
+	paper := renderPaperMarkdown(input)
+	if !strings.Contains(paper, "## References") || strings.Contains(paper, "## 参考文献") {
+		t.Fatalf("paper references heading wrong for APA:\n%s", paper)
+	}
+}
+
 func TestLoadInputReadsAcceptedArtifactsFromStore(t *testing.T) {
 	s := store.NewAt(filepath.Join(t.TempDir(), "store"))
 	input := sampleExportInput()
@@ -163,7 +199,7 @@ func TestLoadInputReadsAcceptedArtifactsFromStore(t *testing.T) {
 func sampleExportInput() ExportInput {
 	return ExportInput{
 		Title:         "Generated AI Review",
-		CitationStyle: "APA",
+		CitationStyle: "gbt7714",
 		CostEstimate:  map[string]any{"usd": 0.12},
 		ConfirmedReferences: contracts.ConfirmedReferences{Items: []contracts.ConfirmedReference{{
 			Key:         "smith2024Rag",
@@ -171,6 +207,7 @@ func sampleExportInput() ExportInput {
 			Authors:     []string{"Smith, Jane"},
 			Year:        2024,
 			DOI:         "10.1000/rag",
+			Venue:       "Journal of Retrieval",
 			ConfirmedAt: time.Date(2026, 6, 7, 10, 0, 0, 0, time.UTC),
 		}}},
 		Chapters: []ChapterInput{{

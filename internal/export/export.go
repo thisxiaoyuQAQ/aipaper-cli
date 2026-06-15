@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -95,7 +96,7 @@ func ExportFinal(s store.Store, input ExportInput, opts Options) (Result, error)
 		if result.Metadata == nil {
 			result.Metadata = make(map[string]any)
 		}
-		result.Metadata["quality_conclusion"] = buildQualityConclusion(input.Quality)
+		result.Metadata["quality_conclusion"] = buildQualityConclusion(input.Quality, input.Language)
 	}
 
 	report := renderReport(input, result, now)
@@ -141,6 +142,7 @@ func buildCitationTrace(version string, generatedAt time.Time, chapters []Chapte
 }
 
 func renderPaperMarkdown(input ExportInput) string {
+	numbering := buildReferenceNumbering(input)
 	var b strings.Builder
 	title := strings.TrimSpace(input.Title)
 	if title == "" {
@@ -148,51 +150,122 @@ func renderPaperMarkdown(input ExportInput) string {
 	}
 	fmt.Fprintf(&b, "# %s\n\n", title)
 	for i, chapter := range input.Chapters {
-		body := strings.TrimSpace(chapter.AcceptedMarkdown)
-		if body == "" {
+		body := renderChapterMarkdown(chapter, numbering)
+		if strings.TrimSpace(body) == "" {
 			continue
 		}
 		if i > 0 {
-			b.WriteString("\n\n")
+			b.WriteString("\n")
 		}
-		if !strings.HasPrefix(body, "#") {
+		if !startsWithMarkdownHeading(body) {
 			chapterTitle := strings.TrimSpace(chapter.Title)
 			if chapterTitle == "" {
 				chapterTitle = chapter.ID
 			}
 			fmt.Fprintf(&b, "## %s\n\n", chapterTitle)
 		}
-		b.WriteString(body)
+		b.WriteString(strings.TrimSpace(body))
+		b.WriteString("\n\n")
+	}
+	refs, _ := renderReferencesMarkdown(input)
+	refs = strings.TrimSpace(stripReferencesHeader(refs))
+	if refs != "" {
+		if normalizeExportCitationStyle(input.CitationStyle) == "gbt7714" {
+			b.WriteString("## 参考文献\n\n")
+		} else {
+			b.WriteString("## References\n\n")
+		}
+		b.WriteString(refs)
 		b.WriteString("\n")
 	}
 	return b.String()
 }
 
+func renderChapterMarkdown(chapter ChapterInput, numbering map[string]int) string {
+	body := strings.TrimSpace(chapter.AcceptedMarkdown)
+	if body == "" {
+		return ""
+	}
+	body = replaceCitationKeys(body, numbering)
+	missing := citationLabelsForChapter(chapter, numbering)
+	if len(missing) == 0 {
+		return body
+	}
+	return appendCitationsToParagraphs(body, missing)
+}
+
+type paragraphCitationLabel struct {
+	ParagraphID string
+	Label       string
+	Numbers     []int
+}
+
 func renderReferencesMarkdown(input ExportInput) (string, []Issue) {
 	var b strings.Builder
 	var issues []Issue
-	style := strings.TrimSpace(input.CitationStyle)
-	if style == "" {
-		style = "default"
+	style := normalizeExportCitationStyle(input.CitationStyle)
+	if style == "gbt7714" {
+		b.WriteString("# 参考文献\n\n")
+	} else {
+		fmt.Fprintf(&b, "# References\n\nCitation style: %s\n\n", style)
 	}
-	fmt.Fprintf(&b, "# References\n\nCitation style: %s\n\n", style)
-	refs := append([]contracts.ConfirmedReference(nil), input.ConfirmedReferences.Items...)
-	sort.SliceStable(refs, func(i, j int) bool {
-		return refs[i].Key < refs[j].Key
-	})
-	for _, ref := range refs {
-		line, ok := formatReference(ref)
+	refs := orderedReferences(input)
+	for i, ref := range refs {
+		line, ok := formatReference(style, i+1, ref)
 		if !ok {
 			issues = append(issues, Issue{Code: CodeReferenceFormat, Message: "reference has incomplete metadata", ReferenceKey: ref.Key})
 		}
-		b.WriteString("- ")
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
 	return b.String(), issues
 }
 
-func formatReference(ref contracts.ConfirmedReference) (string, bool) {
+func formatReference(style string, number int, ref contracts.ConfirmedReference) (string, bool) {
+	if style == "gbt7714" {
+		return formatGBT7714Reference(number, ref)
+	}
+	return formatLegacyReference(ref)
+}
+
+func formatGBT7714Reference(number int, ref contracts.ConfirmedReference) (string, bool) {
+	authors := formatGBTAuthors(ref.Authors)
+	title := strings.TrimSpace(ref.Title)
+	complete := authors != "" && title != ""
+	if authors == "" {
+		authors = "佚名"
+	}
+	if title == "" {
+		title = "未命名文献"
+	}
+	venue := strings.TrimSpace(ref.Venue)
+	year := "n.d."
+	if ref.Year != 0 {
+		year = fmt.Sprintf("%d", ref.Year)
+	}
+	line := fmt.Sprintf("[%d] %s. %s", number, authors, title)
+	if venue != "" {
+		line += fmt.Sprintf("[J]. %s, %s", venue, year)
+	} else {
+		line += fmt.Sprintf("[J/OL]. %s", year)
+	}
+	var suffix []string
+	if strings.TrimSpace(ref.DOI) != "" {
+		suffix = append(suffix, "DOI: "+strings.TrimSpace(ref.DOI))
+	}
+	if strings.TrimSpace(ref.URL) != "" {
+		suffix = append(suffix, strings.TrimSpace(ref.URL))
+	}
+	if len(suffix) > 0 {
+		line += ". " + strings.Join(suffix, ". ")
+	}
+	if !strings.HasSuffix(line, ".") && !strings.HasSuffix(line, "。") {
+		line += "."
+	}
+	return line, complete
+}
+
+func formatLegacyReference(ref contracts.ConfirmedReference) (string, bool) {
 	key := strings.TrimSpace(ref.Key)
 	if key == "" {
 		key = "unknown"
@@ -224,6 +297,262 @@ func formatReference(ref contracts.ConfirmedReference) (string, bool) {
 	return line, complete
 }
 
+func normalizeExportCitationStyle(style string) string {
+	style = strings.ToLower(strings.TrimSpace(style))
+	switch style {
+	case "apa":
+		return "apa"
+	case "gb/t 7714", "gbt-7714", "gbt7714", "":
+		return "gbt7714"
+	default:
+		return style
+	}
+}
+
+func orderedReferences(input ExportInput) []contracts.ConfirmedReference {
+	refsByKey := referenceMap(input.ConfirmedReferences)
+	seen := map[string]bool{}
+	var ordered []contracts.ConfirmedReference
+	for _, chapter := range input.Chapters {
+		for _, mapping := range chapter.CitationMap.Mappings {
+			for _, key := range mapping.ReferenceKeys {
+				if seen[key] {
+					continue
+				}
+				if ref, ok := refsByKey[key]; ok {
+					ordered = append(ordered, ref)
+					seen[key] = true
+				}
+			}
+		}
+	}
+	remaining := append([]contracts.ConfirmedReference(nil), input.ConfirmedReferences.Items...)
+	sort.SliceStable(remaining, func(i, j int) bool { return remaining[i].Key < remaining[j].Key })
+	for _, ref := range remaining {
+		if !seen[ref.Key] {
+			ordered = append(ordered, ref)
+			seen[ref.Key] = true
+		}
+	}
+	return ordered
+}
+
+func buildReferenceNumbering(input ExportInput) map[string]int {
+	numbering := map[string]int{}
+	for i, ref := range orderedReferences(input) {
+		numbering[ref.Key] = i + 1
+	}
+	return numbering
+}
+
+func citationLabelsForChapter(chapter ChapterInput, numbering map[string]int) []paragraphCitationLabel {
+	var labels []paragraphCitationLabel
+	seen := map[string]bool{}
+	for _, mapping := range chapter.CitationMap.Mappings {
+		var nums []int
+		for _, key := range mapping.ReferenceKeys {
+			if n, ok := numbering[key]; ok {
+				nums = append(nums, n)
+			}
+		}
+		nums = uniqueSortedNumbers(nums)
+		if len(nums) == 0 {
+			continue
+		}
+		label := formatCitationNumbers(nums)
+		seenKey := mapping.ParagraphID + "\x00" + label
+		if !seen[seenKey] {
+			labels = append(labels, paragraphCitationLabel{ParagraphID: mapping.ParagraphID, Label: label, Numbers: nums})
+			seen[seenKey] = true
+		}
+	}
+	return labels
+}
+
+func uniqueSortedNumbers(nums []int) []int {
+	if len(nums) == 0 {
+		return nil
+	}
+	sort.Ints(nums)
+	unique := nums[:0]
+	last := 0
+	for i, n := range nums {
+		if i == 0 || n != last {
+			unique = append(unique, n)
+			last = n
+		}
+	}
+	return unique
+}
+
+func formatCitationNumbers(nums []int) string {
+	nums = uniqueSortedNumbers(nums)
+	if len(nums) == 0 {
+		return ""
+	}
+	var parts []string
+	for i := 0; i < len(nums); i++ {
+		start := nums[i]
+		end := start
+		for i+1 < len(nums) && nums[i+1] == end+1 {
+			i++
+			end = nums[i]
+		}
+		if start == end {
+			parts = append(parts, fmt.Sprintf("%d", start))
+		} else {
+			parts = append(parts, fmt.Sprintf("%d-%d", start, end))
+		}
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func replaceCitationKeys(markdown string, numbering map[string]int) string {
+	out := markdown
+	keys := make([]string, 0, len(numbering))
+	for key := range numbering {
+		keys = append(keys, key)
+	}
+	sort.SliceStable(keys, func(i, j int) bool { return len(keys[i]) > len(keys[j]) })
+	for _, key := range keys {
+		label := fmt.Sprintf("[%d]", numbering[key])
+		out = strings.ReplaceAll(out, "["+key+"]", label)
+		out = strings.ReplaceAll(out, "（"+key+"）", label)
+		out = strings.ReplaceAll(out, "("+key+")", label)
+	}
+	return out
+}
+
+func appendCitationsToParagraphs(markdown string, labels []paragraphCitationLabel) string {
+	markdown = normalizeMarkdownNewlines(markdown)
+	parts := strings.Split(markdown, "\n\n")
+	bodyIndices := paragraphBodyIndices(parts)
+	if len(bodyIndices) == 0 {
+		return strings.Join(parts, "\n\n")
+	}
+	nextFallback := 0
+	for _, item := range labels {
+		partIndex := -1
+		if paragraphIndex, ok := paragraphOrdinal(item.ParagraphID); ok && paragraphIndex < len(bodyIndices) {
+			partIndex = bodyIndices[paragraphIndex]
+		} else {
+			for nextFallback < len(bodyIndices) && paragraphHasCitationNumbers(parts[bodyIndices[nextFallback]], item) {
+				nextFallback++
+			}
+			if nextFallback < len(bodyIndices) {
+				partIndex = bodyIndices[nextFallback]
+				nextFallback++
+			}
+		}
+		if partIndex < 0 {
+			partIndex = bodyIndices[len(bodyIndices)-1]
+		}
+		if paragraphHasCitationNumbers(parts[partIndex], item) {
+			continue
+		}
+		parts[partIndex] = strings.TrimRight(parts[partIndex], " \t\n") + item.Label
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func normalizeMarkdownNewlines(markdown string) string {
+	markdown = strings.ReplaceAll(markdown, "\r\n", "\n")
+	return strings.ReplaceAll(markdown, "\r", "\n")
+}
+
+func paragraphBodyIndices(parts []string) []int {
+	var indices []int
+	for i, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" || startsWithMarkdownHeading(trimmed) {
+			continue
+		}
+		indices = append(indices, i)
+	}
+	return indices
+}
+
+func paragraphOrdinal(paragraphID string) (int, bool) {
+	paragraphID = strings.TrimSpace(paragraphID)
+	if paragraphID == "" {
+		return 0, false
+	}
+	idx := strings.LastIndex(paragraphID, "_p")
+	if idx >= 0 {
+		return parseParagraphOrdinal(paragraphID[idx+2:])
+	}
+	if strings.HasPrefix(paragraphID, "p") {
+		return parseParagraphOrdinal(paragraphID[1:])
+	}
+	return 0, false
+}
+
+func parseParagraphOrdinal(value string) (int, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	return n - 1, true
+}
+
+func paragraphHasCitationNumbers(part string, item paragraphCitationLabel) bool {
+	if strings.Contains(part, item.Label) {
+		return true
+	}
+	for _, n := range item.Numbers {
+		if !strings.Contains(part, fmt.Sprintf("[%d]", n)) {
+			return false
+		}
+	}
+	return len(item.Numbers) > 0
+}
+
+func startsWithMarkdownHeading(markdown string) bool {
+	trimmed := strings.TrimSpace(markdown)
+	if trimmed == "" || trimmed[0] != '#' {
+		return false
+	}
+	count := 0
+	for count < len(trimmed) && trimmed[count] == '#' {
+		count++
+	}
+	return count <= 6 && (count == len(trimmed) || trimmed[count] == ' ' || trimmed[count] == '\t')
+}
+
+func stripReferencesHeader(markdown string) string {
+	lines := strings.Split(markdown, "\n")
+	for len(lines) > 0 {
+		line := strings.TrimSpace(lines[0])
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "Citation style:") {
+			lines = lines[1:]
+			continue
+		}
+		break
+	}
+	return strings.Join(lines, "\n")
+}
+
+func formatGBTAuthors(authors []string) string {
+	var cleaned []string
+	for _, author := range authors {
+		author = strings.TrimSpace(author)
+		if author != "" {
+			cleaned = append(cleaned, author)
+		}
+	}
+	if len(cleaned) == 0 {
+		return ""
+	}
+	if len(cleaned) > 3 {
+		return strings.Join(cleaned[:3], ", ") + ", 等"
+	}
+	return strings.Join(cleaned, ", ")
+}
+
 func renderReport(input ExportInput, result Result, generatedAt time.Time) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Export Report\n\n")
@@ -244,8 +573,6 @@ func renderReport(input ExportInput, result Result, generatedAt time.Time) strin
 		fmt.Fprintf(&b, "- Quality report: not generated (compatibility mode)\n")
 	}
 	b.WriteString("\n")
-
-	renderReportQualitySummary(&b, input, result)
 
 	renderReportQualitySummary(&b, input, result)
 
@@ -334,14 +661,38 @@ func renderReportQualitySummary(b *strings.Builder, input ExportInput, result Re
 	b.WriteString("\n")
 }
 
-func buildQualityConclusion(quality QualityInput) string {
+func buildQualityConclusion(quality QualityInput, language string) string {
+	english := strings.EqualFold(strings.TrimSpace(language), "en")
 	if !quality.Available {
-		return "Quality artifacts not available (compatibility mode)"
+		if english {
+			return "Quality artifacts not available (compatibility mode)"
+		}
+		return "质量门控：质量工件不可用（兼容模式）"
 	}
 
 	conclusion := quality.GateOutcome.Conclusion
 	blockerCount := len(quality.GateOutcome.Blockers)
 	findingCount := len(quality.GateOutcome.Findings)
+
+	if english {
+		switch conclusion {
+		case "pass":
+			if findingCount == 0 {
+				return "Quality gate: all chapters passed"
+			}
+			return fmt.Sprintf("Quality gate: passed (%d suggestion(s))", findingCount)
+		case "pass_with_warnings":
+			return fmt.Sprintf("Quality gate: passed with %d warning(s)", findingCount)
+		case "needs_revision":
+			return fmt.Sprintf("Quality gate: %d chapter(s) need revision", chaptersAtSeverity(quality.GateOutcome.Findings, "needs_revision"))
+		case "needs_human_review":
+			return fmt.Sprintf("Quality gate: %d chapter(s) need human review", chaptersAtSeverity(quality.GateOutcome.Findings, "needs_human_review"))
+		case "blocked":
+			return fmt.Sprintf("Quality gate: blocked (%d hard blocker(s))", blockerCount)
+		default:
+			return fmt.Sprintf("Quality gate: %s", conclusion)
+		}
+	}
 
 	switch conclusion {
 	case "pass":

@@ -9,17 +9,19 @@ import (
 )
 
 const (
-	CodeDocxFailed           = "EXPORT_DOCX_FAILED"
-	CodeNoAcceptedChapters   = "EXPORT_NO_ACCEPTED_CHAPTERS"
-	CodeUnconfirmedReference = "EXPORT_UNCONFIRMED_REFERENCE"
-	CodeReferenceFormat      = "EXPORT_REFERENCE_FORMAT_WARNING"
-	CodeQualityReportFailed  = "EXPORT_QUALITY_REPORT_FAILED"
+	CodeDocxFailed              = "EXPORT_DOCX_FAILED"
+	CodeNoAcceptedChapters      = "EXPORT_NO_ACCEPTED_CHAPTERS"
+	CodeUnconfirmedReference    = "EXPORT_UNCONFIRMED_REFERENCE"
+	CodeReferenceFormat         = "EXPORT_REFERENCE_FORMAT_WARNING"
+	CodeQualityReportFailed     = "EXPORT_QUALITY_REPORT_FAILED"
 	CodeQualityArtifactsMissing = "EXPORT_QUALITY_ARTIFACTS_MISSING"
 )
 
 type ExportInput struct {
 	Title               string
+	Language            string
 	CitationStyle       string
+	ArticleTemplate     string
 	Chapters            []ChapterInput
 	ConfirmedReferences contracts.ConfirmedReferences
 	CostEstimate        map[string]any
@@ -32,6 +34,7 @@ type QualityInput struct {
 	LoadError          string
 	Mode               string
 	EvidenceTable      quality.EvidenceTable
+	SectionQualityPlan quality.SectionQualityPlan
 	ClaimGraph         quality.ClaimGraph
 	VerificationResult quality.VerificationResult
 	GateOutcome        quality.GateOutcome

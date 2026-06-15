@@ -53,7 +53,9 @@ func loadRequirements(s store.Store, input *ExportInput) {
 		return
 	}
 	input.Title = strings.TrimSpace(req.Topic)
+	input.Language = strings.TrimSpace(req.Language)
 	input.CitationStyle = strings.TrimSpace(req.CitationStyle)
+	input.ArticleTemplate = strings.TrimSpace(req.ArticleTemplate)
 	input.Quality.Mode = strings.TrimSpace(req.QualityMode)
 }
 
@@ -94,6 +96,17 @@ func loadQualityArtifacts(s store.Store, input *ExportInput) {
 		input.Quality.EvidenceTable = table
 	}
 
+	sectionPlan, err := quality.LoadSectionQualityPlan(s)
+	if err != nil {
+		if qualityArtifactMissing(s, quality.SectionPlanJSONRel) {
+			missing = append(missing, quality.SectionPlanJSONRel)
+		} else {
+			input.Quality.LoadError = err.Error()
+		}
+	} else {
+		input.Quality.SectionQualityPlan = sectionPlan
+	}
+
 	graph, err := quality.LoadClaimGraph(s)
 	if err != nil {
 		if qualityArtifactMissing(s, quality.ClaimGraphJSONRel) {
@@ -131,13 +144,24 @@ func loadQualityArtifacts(s store.Store, input *ExportInput) {
 		evidenceByID[item.ID] = item
 	}
 	input.Quality.GateOutcome = quality.EvaluateQualityGate(quality.GateInput{
-		Mode:          mode,
-		Graph:         graph,
-		ConfirmedKeys: confirmedKeySet(input.ConfirmedReferences),
-		EvidenceByID:  evidenceByID,
-		RewriteRounds: rewriteRoundsByChapter(input.Chapters),
+		Mode:               mode,
+		Graph:              graph,
+		ConfirmedKeys:      confirmedKeySet(input.ConfirmedReferences),
+		EvidenceByID:       evidenceByID,
+		RewriteRounds:      rewriteRoundsByChapter(input.Chapters),
+		SectionQualityPlan: sectionPlan,
+		ChapterMarkdown:    chapterMarkdownByID(input.Chapters),
+		ArticleTemplate:    input.ArticleTemplate,
 	})
 	input.Quality.Available = true
+}
+
+func chapterMarkdownByID(chapters []ChapterInput) map[string]string {
+	out := make(map[string]string, len(chapters))
+	for _, chapter := range chapters {
+		out[chapter.ID] = chapter.AcceptedMarkdown
+	}
+	return out
 }
 
 func qualityArtifactMissing(s store.Store, relPath string) bool {

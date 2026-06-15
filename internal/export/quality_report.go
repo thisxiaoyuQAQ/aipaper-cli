@@ -27,6 +27,7 @@ func (f QualityReportRendererFunc) RenderQualityReport(input ExportInput, genera
 
 func writeQualityReportIfAvailable(s store.Store, input ExportInput, generatedAt time.Time, renderer QualityReportRenderer, result *Result) *Issue {
 	if !input.Quality.Available {
+		removeStaleQualityReport(s)
 		if input.Quality.LoadError != "" {
 			return &Issue{Code: CodeQualityReportFailed, Message: "quality artifacts could not be loaded: " + input.Quality.LoadError}
 		}
@@ -63,11 +64,14 @@ func RenderQualityReport(input ExportInput, generatedAt time.Time) string {
 	outcome := q.GateOutcome
 	if outcome.Conclusion == "" {
 		outcome = quality.EvaluateQualityGate(quality.GateInput{
-			Mode:          q.Mode,
-			Graph:         q.ClaimGraph,
-			ConfirmedKeys: confirmedKeySet(input.ConfirmedReferences),
-			EvidenceByID:  evidenceMap(q.EvidenceTable),
-			RewriteRounds: rewriteRoundsByChapter(input.Chapters),
+			Mode:               q.Mode,
+			Graph:              q.ClaimGraph,
+			ConfirmedKeys:      confirmedKeySet(input.ConfirmedReferences),
+			EvidenceByID:       evidenceMap(q.EvidenceTable),
+			RewriteRounds:      rewriteRoundsByChapter(input.Chapters),
+			SectionQualityPlan: q.SectionQualityPlan,
+			ChapterMarkdown:    chapterMarkdownByID(input.Chapters),
+			ArticleTemplate:    input.ArticleTemplate,
 		})
 	}
 	mode := q.Mode
@@ -89,6 +93,7 @@ func RenderQualityReport(input ExportInput, generatedAt time.Time) string {
 	renderEvidenceDepthDistribution(&b, q.EvidenceTable)
 	renderSupportSummary(&b, q.ClaimGraph)
 	renderUnsupportedAndOverstated(&b, q.ClaimGraph)
+	renderEvidenceSufficiencyFindings(&b, outcome)
 	renderNeedsHumanReview(&b, input, q.ClaimGraph, outcome, mode)
 	renderRewriteSummary(&b, input, q.ClaimGraph, outcome)
 	renderNextSteps(&b, q.ClaimGraph, outcome)
@@ -164,6 +169,24 @@ func renderUnsupportedAndOverstated(b *strings.Builder, graph quality.ClaimGraph
 		fmt.Fprintf(b, "| %s | `%s` | `%s` | %s | %s |\n",
 			markdownCell(node.ChapterID), node.ID, node.Support, markdownCell(node.Text), markdownCell(node.VerifierNote))
 	}
+	b.WriteString("\n")
+}
+
+func renderEvidenceSufficiencyFindings(b *strings.Builder, outcome quality.GateOutcome) {
+	b.WriteString("## Evidence Sufficiency and Content Signals\n\n")
+	findings := filterGateIssues(outcome.Findings, func(issue quality.GateIssue) bool {
+		switch issue.Code {
+		case quality.CodeGateEvidenceInsufficient, quality.CodeGateRequiredEvidenceUnused, quality.CodeGateMetadataOnlyChapter, quality.CodeGateLowContentSignal:
+			return true
+		default:
+			return false
+		}
+	})
+	if len(findings) == 0 {
+		b.WriteString("- None\n\n")
+		return
+	}
+	renderGateIssueTable(b, findings)
 	b.WriteString("\n")
 }
 
@@ -269,6 +292,16 @@ func filterClaims(claims []quality.ClaimNode, keep func(quality.ClaimNode) bool)
 	for _, node := range claims {
 		if keep(node) {
 			out = append(out, node)
+		}
+	}
+	return out
+}
+
+func filterGateIssues(issues []quality.GateIssue, keep func(quality.GateIssue) bool) []quality.GateIssue {
+	out := make([]quality.GateIssue, 0, len(issues))
+	for _, issue := range issues {
+		if keep(issue) {
+			out = append(out, issue)
 		}
 	}
 	return out

@@ -224,7 +224,7 @@ func TestE2EBeforeAfterStructuralComparison(t *testing.T) {
 	if !strings.Contains(enhancedReport, "## Quality Summary") || strings.Contains(enhancedReport, "compatibility mode") {
 		t.Fatalf("enhanced report.md quality summary wrong:\n%s", enhancedReport)
 	}
-	if !strings.Contains(after.metadata, "质量门控") {
+	if !strings.Contains(after.metadata, "Quality gate") {
 		t.Fatalf("enhanced metadata = %q, want gate conclusion", after.metadata)
 	}
 	if after.claimsWithEvidence != after.claimsTotal || after.claimsTotal != 3 {

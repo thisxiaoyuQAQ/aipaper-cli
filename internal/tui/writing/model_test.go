@@ -289,18 +289,33 @@ func TestUpdateKey_CtrlC_WhileRunning(t *testing.T) {
 
 	m = m.UpdateKey("ctrl+c")
 
-	// After Ctrl+C, should be stopping (not immediately canceled)
-	if !m.stopRequested {
-		t.Error("expected stopRequested to be true")
+	// Ctrl+C is handled by RootModel as exit/exit-confirm, not by Writing as pause.
+	if m.stopRequested {
+		t.Error("expected stopRequested to remain false")
 	}
-	if !m.stopping {
-		t.Error("expected stopping to be true")
+	if m.stopping {
+		t.Error("expected stopping to remain false")
 	}
 	if m.canceled {
-		t.Error("expected canceled to be false until checkpoint saved")
+		t.Error("expected canceled to remain false")
 	}
-	if len(m.logs) == 0 {
-		t.Error("expected stop request log entry")
+}
+
+func TestUpdateKey_EscRequestsPause(t *testing.T) {
+	m := NewModel(Options{Width: 120, Height: 40})
+	m.running = true
+
+	updated, cmd := m.handleKey("esc")
+	m = updated.(Model)
+
+	if !m.pauseRequested {
+		t.Error("expected pauseRequested to be true")
+	}
+	if cmd == nil {
+		t.Fatal("expected pause command")
+	}
+	if _, ok := cmd().(RuntimePauseRequestedMsg); !ok {
+		t.Fatalf("expected RuntimePauseRequestedMsg")
 	}
 }
 

@@ -13,7 +13,7 @@ func TestRecoverPromptModel_UpdateKey_Continue(t *testing.T) {
 	}
 	m := NewRecoverPromptModel(probe)
 
-	// Press 'c' to continue
+	// Press 'c' to 继续
 	m = m.UpdateKey("c")
 	if m.Action() != RecoverActionContinue {
 		t.Errorf("expected action=%q, got %q", RecoverActionContinue, m.Action())
@@ -28,14 +28,14 @@ func TestRecoverPromptModel_UpdateKey_ContinueWithEnter(t *testing.T) {
 	}
 	m := NewRecoverPromptModel(probe)
 
-	// Press Enter to continue
+	// Press Enter to 继续
 	m = m.UpdateKey("enter")
 	if m.Action() != RecoverActionContinue {
 		t.Errorf("expected action=%q, got %q", RecoverActionContinue, m.Action())
 	}
 }
 
-func TestRecoverPromptModel_UpdateKey_RestartRequiresConfirmation(t *testing.T) {
+func TestRecoverPromptModel_UpdateKey_重新开始RequiresConfirmation(t *testing.T) {
 	probe := ProbeResult{
 		CheckpointStep:  42,
 		CheckpointPhase: "review_chapter",
@@ -43,16 +43,16 @@ func TestRecoverPromptModel_UpdateKey_RestartRequiresConfirmation(t *testing.T) 
 	}
 	m := NewRecoverPromptModel(probe)
 
-	// Press 'r' to request restart
+	// Press 'r' to request 重新开始
 	m = m.UpdateKey("r")
 	if m.Action() != RecoverActionNone {
-		t.Errorf("expected action=%q after restart request, got %q", RecoverActionNone, m.Action())
+		t.Errorf("expected action=%q after 重新开始 request, got %q", RecoverActionNone, m.Action())
 	}
 
 	// View should show confirmation prompt
 	view := m.View()
-	if !strings.Contains(view, "Restart") {
-		t.Errorf("expected view to show restart confirmation prompt")
+	if !strings.Contains(view, "重新开始") {
+		t.Errorf("expected view to show 重新开始 confirmation prompt")
 	}
 
 	// Now in confirmation mode, press 'y' to confirm
@@ -62,7 +62,7 @@ func TestRecoverPromptModel_UpdateKey_RestartRequiresConfirmation(t *testing.T) 
 	}
 }
 
-func TestRecoverPromptModel_UpdateKey_RestartCancelConfirmation(t *testing.T) {
+func TestRecoverPromptModel_UpdateKey_重新开始CancelConfirmation(t *testing.T) {
 	probe := ProbeResult{
 		CheckpointStep:  42,
 		CheckpointPhase: "review_chapter",
@@ -70,13 +70,13 @@ func TestRecoverPromptModel_UpdateKey_RestartCancelConfirmation(t *testing.T) {
 	}
 	m := NewRecoverPromptModel(probe)
 
-	// Press 'r' to request restart
+	// Press 'r' to request 重新开始
 	m = m.UpdateKey("r")
 
 	// View should show confirmation prompt
 	view := m.View()
-	if !strings.Contains(view, "Restart") {
-		t.Errorf("expected view to show restart confirmation prompt")
+	if !strings.Contains(view, "重新开始") {
+		t.Errorf("expected view to show 重新开始 confirmation prompt")
 	}
 
 	// Now in confirmation mode, press 'n' to cancel
@@ -87,7 +87,7 @@ func TestRecoverPromptModel_UpdateKey_RestartCancelConfirmation(t *testing.T) {
 
 	// View should not show confirmation anymore
 	view = m.View()
-	if !strings.Contains(view, "continue") {
+	if !strings.Contains(view, "继续") {
 		t.Errorf("expected view to show normal options after cancel")
 	}
 }
@@ -155,11 +155,11 @@ func TestRecoverPromptModel_View_ShowsCheckpointInfo(t *testing.T) {
 	}
 
 	// Should show action options
-	if !strings.Contains(view, "continue") {
-		t.Errorf("view should contain 'continue' option")
+	if !strings.Contains(view, "继续") {
+		t.Errorf("view should contain '继续' option")
 	}
-	if !strings.Contains(view, "restart") {
-		t.Errorf("view should contain 'restart' option")
+	if !strings.Contains(view, "重新开始") {
+		t.Errorf("view should contain '重新开始' option")
 	}
 }
 
@@ -171,17 +171,17 @@ func TestRecoverPromptModel_View_ShowsConfirmationPrompt(t *testing.T) {
 	}
 	m := NewRecoverPromptModel(probe)
 
-	// Enter restart confirmation mode
+	// Enter 重新开始 confirmation mode
 	m = m.UpdateKey("r")
 
 	view := m.View()
 
 	// Should show confirmation prompt
-	if !strings.Contains(view, "Restart") {
-		t.Errorf("view should contain 'Restart' in confirmation mode")
+	if !strings.Contains(view, "重新开始") {
+		t.Errorf("view should contain '重新开始' in confirmation mode")
 	}
-	if !strings.Contains(view, "keeps") && !strings.Contains(view, "intact") {
-		t.Errorf("view should mention that files are kept intact")
+	if !strings.Contains(view, "保留") && !strings.Contains(view, "已有输出文件") {
+		t.Errorf("view should mention that files are kept 已有输出文件")
 	}
 }
 

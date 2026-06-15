@@ -1,12 +1,15 @@
 package requirements
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
 )
 
 type Field int
@@ -17,6 +20,7 @@ const (
 	FieldScope
 	FieldLanguage
 	FieldCitationStyle
+	FieldArticleTemplate
 	FieldQualityMode
 	FieldTargetWords
 	FieldMaterialDir
@@ -32,6 +36,7 @@ var orderedFields = []Field{
 	FieldScope,
 	FieldLanguage,
 	FieldCitationStyle,
+	FieldArticleTemplate,
 	FieldQualityMode,
 	FieldTargetWords,
 	FieldMaterialDir,
@@ -41,15 +46,24 @@ var orderedFields = []Field{
 	FieldConstraints,
 }
 
+type Options struct {
+	I18N i18n.T
+}
+
 type Model struct {
 	values   map[Field]string
 	cursor   int
 	done     bool
 	canceled bool
 	err      error
+	i18n     i18n.T
 }
 
-func NewModel(defaults contracts.Requirements) Model {
+func NewModel(defaults contracts.Requirements, opts ...Options) Model {
+	tr := i18n.New("")
+	if len(opts) > 0 && !opts[0].I18N.IsZero() {
+		tr = opts[0].I18N
+	}
 	qualityMode := defaults.QualityMode
 	if qualityMode == "" {
 		qualityMode = "enhanced"
@@ -60,6 +74,7 @@ func NewModel(defaults contracts.Requirements) Model {
 		FieldScope:              defaults.Scope,
 		FieldLanguage:           defaults.Language,
 		FieldCitationStyle:      defaults.CitationStyle,
+		FieldArticleTemplate:    defaults.ArticleTemplate,
 		FieldQualityMode:        qualityMode,
 		FieldTargetWords:        intString(defaults.TargetWords),
 		FieldMaterialDir:        defaults.MaterialDir,
@@ -68,7 +83,7 @@ func NewModel(defaults contracts.Requirements) Model {
 		FieldChapterPreferences: strings.Join(defaults.ChapterPreferences, "\n"),
 		FieldConstraints:        strings.Join(defaults.Constraints, "\n"),
 	}
-	return Model{values: values}
+	return Model{values: values, i18n: tr}
 }
 
 func (m Model) UpdateKey(key string) Model {
@@ -94,8 +109,8 @@ func (m Model) UpdateKey(key string) Model {
 	case "backspace":
 		m.backspace()
 	case "enter":
-		if req, err := m.Requirements(); err != nil {
-			_ = req
+		_, err := m.Requirements()
+		if err != nil {
 			m.err = err
 			return m
 		}
@@ -122,7 +137,7 @@ func (m Model) SetField(field Field, value string) Model {
 func (m Model) Requirements() (contracts.Requirements, error) {
 	targetWords, err := strconv.Atoi(strings.TrimSpace(m.values[FieldTargetWords]))
 	if err != nil {
-		return contracts.Requirements{}, fmt.Errorf("target words must be a positive integer")
+		return contracts.Requirements{}, errors.New(m.i18n.Text(i18n.RequirementsErrTargetWordsInteger))
 	}
 	req := contracts.Requirements{
 		Topic:              strings.TrimSpace(m.values[FieldTopic]),
@@ -130,6 +145,7 @@ func (m Model) Requirements() (contracts.Requirements, error) {
 		Scope:              strings.TrimSpace(m.values[FieldScope]),
 		Language:           normalizeLanguage(m.values[FieldLanguage]),
 		CitationStyle:      normalizeCitationStyle(m.values[FieldCitationStyle], m.values[FieldLanguage]),
+		ArticleTemplate:    normalizeArticleTemplate(m.values[FieldArticleTemplate]),
 		QualityMode:        normalizeQualityMode(m.values[FieldQualityMode]),
 		TargetWords:        targetWords,
 		MaterialDir:        strings.TrimSpace(m.values[FieldMaterialDir]),
@@ -141,10 +157,44 @@ func (m Model) Requirements() (contracts.Requirements, error) {
 	if !req.AllowOnlineSearch {
 		req.SearchProviders = nil
 	}
-	if err := Validate(req); err != nil {
+	if err := m.validate(req); err != nil {
 		return contracts.Requirements{}, err
 	}
 	return req, nil
+}
+
+func (m Model) validate(req contracts.Requirements) error {
+	if strings.TrimSpace(req.Topic) == "" {
+		return errors.New(m.i18n.Text(i18n.RequirementsErrTopicRequired))
+	}
+	if req.Language != "zh-CN" && req.Language != "en" {
+		return errors.New(m.i18n.Text(i18n.RequirementsErrLanguage))
+	}
+	switch req.CitationStyle {
+	case "gbt7714", "apa":
+	default:
+		return errors.New(m.i18n.Text(i18n.RequirementsErrCitation))
+	}
+	switch req.QualityMode {
+	case "", "fast", "enhanced", "strict":
+	default:
+		return errors.New(m.i18n.Text(i18n.RequirementsErrQualityMode))
+	}
+	if !quality.ValidArticleTemplateID(req.ArticleTemplate) {
+		return errors.New(m.i18n.Text(i18n.RequirementsErrArticleTemplate))
+	}
+	if req.TargetWords <= 0 {
+		return errors.New(m.i18n.Text(i18n.RequirementsErrTargetWordsPositive))
+	}
+	if strings.TrimSpace(req.MaterialDir) == "" {
+		return errors.New(m.i18n.Text(i18n.RequirementsErrMaterialDirRequired))
+	}
+	if info, err := os.Stat(req.MaterialDir); err != nil {
+		return fmt.Errorf("%s", fmt.Sprintf(m.i18n.Text(i18n.RequirementsErrMaterialDirAccess), err))
+	} else if !info.IsDir() {
+		return errors.New(m.i18n.Text(i18n.RequirementsErrMaterialDirNotDir))
+	}
+	return nil
 }
 
 func Validate(req contracts.Requirements) error {
@@ -163,6 +213,9 @@ func Validate(req contracts.Requirements) error {
 	case "", "fast", "enhanced", "strict":
 	default:
 		return fmt.Errorf("quality mode must be fast, enhanced, or strict")
+	}
+	if !quality.ValidArticleTemplateID(req.ArticleTemplate) {
+		return fmt.Errorf("article template must be zh_course_paper or review_paper")
 	}
 	if req.TargetWords <= 0 {
 		return fmt.Errorf("target words must be positive")
@@ -257,22 +310,23 @@ func normalizeCitationStyle(style, language string) string {
 	if style != "" {
 		return style
 	}
-	if normalizeLanguage(language) == "zh-CN" {
-		return "gbt7714"
+	return "gbt7714"
+}
+
+func normalizeArticleTemplate(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return quality.ArticleTemplateZhCoursePaper
 	}
-	return "apa"
+	return value
 }
 
 func normalizeQualityMode(mode string) string {
 	mode = strings.ToLower(strings.TrimSpace(mode))
-	switch mode {
-	case "fast", "enhanced", "strict":
-		return mode
-	case "":
-		return "enhanced"
-	default:
+	if mode == "" {
 		return "enhanced"
 	}
+	return mode
 }
 
 func parseBool(value string) bool {

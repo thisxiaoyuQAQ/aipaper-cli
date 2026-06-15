@@ -10,8 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	runtimeapp "github.com/thisxiaoyuQAQ/aipaper-cli/internal/app"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/export"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/search"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
@@ -49,6 +51,7 @@ type RootOptions struct {
 	InitialScreen Screen
 	StateProbe    StateProbeFunc
 	Recover       func(string) (runtimeapp.RecoveryResult, error)
+	I18N          i18n.T
 	// RuntimeStarter launches the real writing runtime when the writing
 	// screen starts; nil uses StartWritingRuntime (module-22 bugfix wiring).
 	RuntimeStarter WritingRuntimeStarter
@@ -68,11 +71,16 @@ type RootModel struct {
 	ExportSummary exportsummarytui.Model
 	Done          donetui.Model
 	Probe         ProbeResult
+	i18n          i18n.T
 	recover       func(string) (runtimeapp.RecoveryResult, error)
 
 	// Real writing runtime (module-22 bugfix wiring)
 	runtimeStarter WritingRuntimeStarter
 	runtime        *WritingRuntime
+
+	// Runtime commands issued before the runtime starter returns.
+	pendingRuntimePause        bool
+	pendingRuntimeInstructions []string
 
 	// Exit confirmation state
 	exitConfirm       bool
@@ -89,9 +97,19 @@ func NewRootModel(opts RootOptions) RootModel {
 	if recoverFn == nil {
 		recoverFn = runtimeapp.Recover
 	}
+	tr := opts.I18N
+	if tr.IsZero() {
+		cfg, _, err := config.Load(config.LoadOptions{WorkDir: opts.WorkDir})
+		if err == nil {
+			tr = i18n.New(cfg.UILanguage)
+		} else {
+			tr = i18n.New("")
+		}
+	}
 	m := RootModel{
 		WorkDir:        opts.WorkDir,
-		ConfigWizard:   configwizard.NewModel(configwizard.Options{WorkDir: opts.WorkDir}),
+		ConfigWizard:   configwizard.NewModel(configwizard.Options{WorkDir: opts.WorkDir, I18N: tr}),
+		i18n:           tr,
 		recover:        recoverFn,
 		runtimeStarter: opts.RuntimeStarter,
 	}
@@ -117,23 +135,23 @@ func NewRootModel(opts RootOptions) RootModel {
 	}
 	m.CurrentScreen = screen
 	if screen == ScreenRecoverPrompt {
-		m.RecoverPrompt = NewRecoverPromptModel(m.Probe)
+		m.RecoverPrompt = NewRecoverPromptModel(m.Probe, m.i18n)
 	}
 	if screen == ScreenRequirements {
-		m.Requirements = newRequirementsModel()
+		m.Requirements = newRequirementsModel(m.i18n)
 	}
 	if screen == ScreenMaterialsScan {
-		materialsModel, err := newMaterialsModel(m.WorkDir, m.ScreenData)
+		materialsModel, err := newMaterialsModel(m.WorkDir, m.ScreenData, m.i18n)
 		if err != nil {
 			m.err = err
 			m.CurrentScreen = ScreenRequirements
-			m.Requirements = newRequirementsModel()
+			m.Requirements = newRequirementsModel(m.i18n)
 		} else {
 			m.Materials = materialsModel
 		}
 	}
 	if screen == ScreenSearchProgress {
-		searchModel, err := newSearchModel(m.WorkDir, m.ScreenData)
+		searchModel, err := newSearchModel(m.WorkDir, m.ScreenData, m.i18n)
 		if err != nil {
 			m.err = err
 		} else {
@@ -141,7 +159,7 @@ func NewRootModel(opts RootOptions) RootModel {
 		}
 	}
 	if screen == ScreenReferences {
-		referencesModel, err := newReferencesModel(m.WorkDir, m.ScreenData)
+		referencesModel, err := newReferencesModel(m.WorkDir, m.ScreenData, m.i18n)
 		if err != nil {
 			m.err = err
 		} else {
@@ -149,14 +167,14 @@ func NewRootModel(opts RootOptions) RootModel {
 		}
 	}
 	if screen == ScreenWriting {
-		writingModel := newWritingModel(m.WorkDir, m.ScreenData)
+		writingModel := newWritingModel(m.WorkDir, m.ScreenData, m.i18n)
 		m.Writing = writingModel
 	}
 	if screen == ScreenExportSummary {
-		m.ExportSummary = newExportSummaryModel(m.WorkDir)
+		m.ExportSummary = newExportSummaryModel(m.WorkDir, m.i18n)
 	}
 	if screen == ScreenDone {
-		m.Done = newDoneModel(m.WorkDir, m.ScreenData)
+		m.Done = newDoneModel(m.WorkDir, m.ScreenData, m.i18n)
 	}
 	return m
 }
@@ -214,7 +232,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var searchModel searchtui.Model
 		if msg.Next == ScreenMaterialsScan {
 			var err error
-			materialsModel, err = newMaterialsModel(m.WorkDir, msg.Data)
+			materialsModel, err = newMaterialsModel(m.WorkDir, msg.Data, m.i18n)
 			if err != nil {
 				m.err = err
 				return m, nil
@@ -222,7 +240,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.Next == ScreenSearchProgress {
 			var err error
-			searchModel, err = newSearchModel(m.WorkDir, msg.Data)
+			searchModel, err = newSearchModel(m.WorkDir, msg.Data, m.i18n)
 			if err != nil {
 				m.err = err
 				return m, nil
@@ -231,7 +249,7 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var referencesModel referencestui.Model
 		if msg.Next == ScreenReferences {
 			var err error
-			referencesModel, err = newReferencesModel(m.WorkDir, msg.Data)
+			referencesModel, err = newReferencesModel(m.WorkDir, msg.Data, m.i18n)
 			if err != nil {
 				m.err = err
 				return m, nil
@@ -239,23 +257,23 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		var writingModel writingtui.Model
 		if msg.Next == ScreenWriting {
-			writingModel = newWritingModel(m.WorkDir, msg.Data)
+			writingModel = newWritingModel(m.WorkDir, msg.Data, m.i18n)
 		}
 		m.CurrentScreen = msg.Next
 		m.ScreenData = msg.Data
 		m.err = nil
 		m.exitConfirm = false
 		if msg.Next == ScreenConfigWizard {
-			m.ConfigWizard = configwizard.NewModel(configwizard.Options{WorkDir: m.WorkDir})
+			m.ConfigWizard = configwizard.NewModel(configwizard.Options{WorkDir: m.WorkDir, I18N: m.i18n})
 		}
 		if msg.Next == ScreenRecoverPrompt {
 			if probe, ok := msg.Data.(ProbeResult); ok {
 				m.Probe = probe
 			}
-			m.RecoverPrompt = NewRecoverPromptModel(m.Probe)
+			m.RecoverPrompt = NewRecoverPromptModel(m.Probe, m.i18n)
 		}
 		if msg.Next == ScreenRequirements {
-			m.Requirements = newRequirementsModel()
+			m.Requirements = newRequirementsModel(m.i18n)
 		}
 		if msg.Next == ScreenMaterialsScan {
 			m.Materials = materialsModel
@@ -274,11 +292,11 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 		}
 		if msg.Next == ScreenExportSummary {
-			m.ExportSummary = newExportSummaryModel(m.WorkDir)
+			m.ExportSummary = newExportSummaryModel(m.WorkDir, m.i18n)
 			return m, m.ExportSummary.Init()
 		}
 		if msg.Next == ScreenDone {
-			m.Done = newDoneModel(m.WorkDir, msg.Data)
+			m.Done = newDoneModel(m.WorkDir, msg.Data, m.i18n)
 			return m, nil
 		}
 	case materialstui.ScanFinishedMsg:
@@ -296,6 +314,8 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case writingRuntimeStartedMsg:
 		// Module-22 bugfix wiring: the real runtime started (or failed to).
 		if msg.err != nil {
+			m.pendingRuntimePause = false
+			m.pendingRuntimeInstructions = nil
 			updated, _ := m.Writing.Update(writingtui.RuntimeDoneMsg{Error: msg.err})
 			if writingModel, ok := updated.(writingtui.Model); ok {
 				m.Writing = writingModel
@@ -304,6 +324,14 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.runtime = msg.runtime
+		if m.pendingRuntimePause {
+			m.runtime.RequestPause()
+			m.pendingRuntimePause = false
+		}
+		for _, text := range m.pendingRuntimeInstructions {
+			m.runtime.SubmitInstruction(text)
+		}
+		m.pendingRuntimeInstructions = nil
 		return m, m.runtime.NextEventCmd()
 	case writingtui.RuntimeEventMsg:
 		if m.CurrentScreen == ScreenWriting {
@@ -311,6 +339,12 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if writingModel, ok := updated.(writingtui.Model); ok {
 				m.Writing = writingModel
 			}
+			if m.Writing.Canceled() {
+				return m, tea.Quit
+			}
+		}
+		if m.runtime == nil {
+			return m, nil
 		}
 		return m, m.runtime.NextEventCmd()
 	case writingtui.RuntimeDoneMsg:
@@ -319,24 +353,62 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if writingModel, ok := updated.(writingtui.Model); ok {
 				m.Writing = writingModel
 			}
+			if m.Writing.Done() && m.Writing.Err() == nil {
+				m.CurrentScreen = ScreenExportSummary
+				m.ScreenData = nil
+				m.ExportSummary = newExportSummaryModel(m.WorkDir, m.i18n)
+				m.err = nil
+				return m, m.ExportSummary.Init()
+			}
+			m.err = m.Writing.Err()
 		}
 		return m, nil
 	case writingtui.RuntimeStopRequestedMsg:
-		// Forward stop request to writing model and abort the real runtime
+		// Backward compatibility for older tests/messages: abort the real runtime.
 		if m.CurrentScreen == ScreenWriting {
-			updated, _ := m.Writing.Update(msg)
-			if writingModel, ok := updated.(writingtui.Model); ok {
-				m.Writing = writingModel
+			if m.runtime != nil {
+				m.runtime.Stop()
 			}
-			m.runtime.Stop()
 			return m, nil
 		}
+	case writingtui.RuntimePauseRequestedMsg:
+		if m.CurrentScreen == ScreenWriting {
+			if m.runtime != nil {
+				m.runtime.RequestPause()
+			} else {
+				m.pendingRuntimePause = true
+			}
+		}
+		return m, nil
+	case writingtui.RuntimeResumeRequestedMsg:
+		if m.CurrentScreen == ScreenWriting {
+			if m.runtime != nil {
+				m.runtime.Resume()
+			} else {
+				m.pendingRuntimePause = false
+			}
+		}
+		return m, nil
+	case writingtui.RuntimeInstructionSubmittedMsg:
+		if m.CurrentScreen == ScreenWriting {
+			if m.runtime != nil {
+				m.runtime.SubmitInstruction(msg.Text)
+			} else {
+				m.pendingRuntimeInstructions = append(m.pendingRuntimeInstructions, msg.Text)
+			}
+		}
+		return m, nil
 	case tea.KeyMsg:
 		// Handle exit confirmation first
 		if m.exitConfirm {
 			key := strings.ToLower(strings.TrimSpace(msg.String()))
 			switch key {
 			case "y":
+				if m.exitConfirmScreen == ScreenWriting && m.runtime != nil {
+					m.runtime.Stop()
+					m.exitConfirm = false
+					return m, m.runtime.NextEventCmd()
+				}
 				return m, tea.Quit
 			case "n", "esc":
 				m.exitConfirm = false
@@ -348,9 +420,12 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentScreen == ScreenConfigWizard {
 			m.ConfigWizard = m.ConfigWizard.UpdateKey(msg.String())
 			if m.ConfigWizard.Done() {
+				if savedCfg, _, err := config.Load(config.LoadOptions{WorkDir: m.WorkDir}); err == nil {
+					m.i18n = i18n.New(savedCfg.UILanguage)
+				}
 				m.CurrentScreen = ScreenRequirements
 				m.ScreenData = m.ConfigWizard.SavedPath()
-				m.Requirements = newRequirementsModel()
+				m.Requirements = newRequirementsModel(m.i18n)
 				m.err = nil
 				return m, nil
 			}
@@ -374,13 +449,13 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.CurrentScreen = ScreenWriting
 				m.ScreenData = WritingResumeData{Recovery: result, RecoveryPrompt: result.RecoveryPrompt}
-				m.Writing = newWritingModel(m.WorkDir, m.ScreenData)
+				m.Writing = newWritingModel(m.WorkDir, m.ScreenData, m.i18n)
 				m.err = nil
 				return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 			case RecoverActionRestart:
 				m.CurrentScreen = ScreenRequirements
 				m.ScreenData = RecoverActionRestart
-				m.Requirements = newRequirementsModel()
+				m.Requirements = newRequirementsModel(m.i18n)
 				m.err = nil
 				return m, nil
 			case RecoverActionExit:
@@ -401,7 +476,12 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateReferences(msg.String())
 		}
 		if m.CurrentScreen == ScreenWriting {
-			return m.updateWriting(msg.String())
+			if msg.String() == "ctrl+c" || msg.String() == "q" {
+				m.exitConfirm = true
+				m.exitConfirmScreen = m.CurrentScreen
+				return m, nil
+			}
+			return m.updateWriting(msg)
 		}
 		if m.CurrentScreen == ScreenExportSummary {
 			return m.updateExportSummary(msg.String())
@@ -427,6 +507,10 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Quit
 		}
+	case tea.MouseMsg:
+		if m.CurrentScreen == ScreenWriting {
+			return m.updateWriting(msg)
+		}
 	default:
 		if m.CurrentScreen == ScreenExportSummary {
 			updated, cmd := m.ExportSummary.Update(msg)
@@ -444,7 +528,7 @@ func (m RootModel) View() string {
 	// Show exit confirmation if active
 	if m.exitConfirm {
 		view := m.currentScreenView()
-		return view + "\n\n⚠ Exit? Unsaved changes may be lost. [Y] Yes  [N] No\n"
+		return view + "\n\n" + m.i18n.Text(i18n.RootExitConfirm) + "\n"
 	}
 
 	if m.CurrentScreen == ScreenConfigWizard {
@@ -453,35 +537,35 @@ func (m RootModel) View() string {
 	if m.CurrentScreen == ScreenRecoverPrompt {
 		view := m.RecoverPrompt.View()
 		if m.err != nil {
-			return view + "\nError: " + m.err.Error() + "\n"
+			return view + "\n" + m.i18n.Text(i18n.CommonErrorPrefix) + ": " + m.err.Error() + "\n"
 		}
 		return view
 	}
 	if m.CurrentScreen == ScreenRequirements {
 		view := m.Requirements.View()
 		if m.err != nil {
-			return view + "\nError: " + m.err.Error() + "\n"
+			return view + "\n" + m.i18n.Text(i18n.CommonErrorPrefix) + ": " + m.err.Error() + "\n"
 		}
 		return view
 	}
 	if m.CurrentScreen == ScreenMaterialsScan {
 		view := m.Materials.View()
 		if m.err != nil && m.Materials.Err() == nil {
-			return view + "\nError: " + m.err.Error() + "\n"
+			return view + "\n" + m.i18n.Text(i18n.CommonErrorPrefix) + ": " + m.err.Error() + "\n"
 		}
 		return view
 	}
 	if m.CurrentScreen == ScreenSearchProgress {
 		view := m.Search.View()
 		if m.err != nil && m.Search.Err() == nil {
-			return view + "\nError: " + m.err.Error() + "\n"
+			return view + "\n" + m.i18n.Text(i18n.CommonErrorPrefix) + ": " + m.err.Error() + "\n"
 		}
 		return view
 	}
 	if m.CurrentScreen == ScreenReferences {
 		view := m.References.View()
 		if m.err != nil && m.References.Err() == nil {
-			return view + "\nError: " + m.err.Error() + "\n"
+			return view + "\n" + m.i18n.Text(i18n.CommonErrorPrefix) + ": " + m.err.Error() + "\n"
 		}
 		return view
 	}
@@ -495,7 +579,7 @@ func (m RootModel) View() string {
 		return m.Done.View()
 	}
 	if m.err != nil {
-		return fmt.Sprintf("aipaper-cli\n\n%s\n\nError: %s\n", m.CurrentScreen, m.err)
+		return fmt.Sprintf("aipaper-cli\n\n%s\n\n%s: %s\n", m.CurrentScreen, m.i18n.Text(i18n.CommonErrorPrefix), m.err)
 	}
 	return fmt.Sprintf("aipaper-cli\n\n%s\n", m.CurrentScreen)
 }
@@ -517,7 +601,7 @@ func (m RootModel) updateRequirements(key string) (tea.Model, tea.Cmd) {
 		}
 		m.CurrentScreen = ScreenMaterialsScan
 		m.ScreenData = req
-		materialsModel, err := newMaterialsModelWithCreatedDir(m.WorkDir, req, createdMaterialDir)
+		materialsModel, err := newMaterialsModelWithCreatedDir(m.WorkDir, req, createdMaterialDir, m.i18n)
 		if err != nil {
 			m.err = err
 			return m, nil
@@ -542,7 +626,7 @@ func (m RootModel) updateMaterials(key string) (tea.Model, tea.Cmd) {
 	switch m.Materials.Action() {
 	case materialstui.ActionContinue, materialstui.ActionSkip:
 		result := m.Materials.Result()
-		searchModel, err := newSearchModel(m.WorkDir, result)
+		searchModel, err := newSearchModel(m.WorkDir, result, m.i18n)
 		if err != nil {
 			m.err = err
 			return m, nil
@@ -555,7 +639,7 @@ func (m RootModel) updateMaterials(key string) (tea.Model, tea.Cmd) {
 	case materialstui.ActionBack:
 		m.CurrentScreen = ScreenRequirements
 		m.ScreenData = materialstui.ActionBack
-		m.Requirements = newRequirementsModel()
+		m.Requirements = newRequirementsModel(m.i18n)
 		m.err = nil
 		return m, nil
 	case materialstui.ActionCancel:
@@ -571,7 +655,7 @@ func (m RootModel) updateSearch(key string) (tea.Model, tea.Cmd) {
 	m.err = m.Search.Err()
 	switch m.Search.Action() {
 	case searchtui.ActionContinue, searchtui.ActionSkip:
-		referencesModel, err := newReferencesModel(m.WorkDir, m.Search.Result())
+		referencesModel, err := newReferencesModel(m.WorkDir, m.Search.Result(), m.i18n)
 		if err != nil {
 			m.err = err
 			return m, nil
@@ -583,7 +667,7 @@ func (m RootModel) updateSearch(key string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case searchtui.ActionBack:
 		m.CurrentScreen = ScreenMaterialsScan
-		materialsModel, err := newMaterialsModel(m.WorkDir, nil)
+		materialsModel, err := newMaterialsModel(m.WorkDir, nil, m.i18n)
 		if err != nil {
 			m.err = err
 			return m, nil
@@ -632,11 +716,15 @@ func (m RootModel) collectRequirements() (contracts.Requirements, bool, error) {
 	return req, createdMaterialDir, nil
 }
 
-func newMaterialsModel(workDir string, data any) (materialstui.Model, error) {
-	return newMaterialsModelWithCreatedDir(workDir, data, false)
+func newMaterialsModel(workDir string, data any, trs ...i18n.T) (materialstui.Model, error) {
+	return newMaterialsModelWithCreatedDir(workDir, data, false, trs...)
 }
 
-func newMaterialsModelWithCreatedDir(workDir string, data any, createdMaterialDir bool) (materialstui.Model, error) {
+func newMaterialsModelWithCreatedDir(workDir string, data any, createdMaterialDir bool, trs ...i18n.T) (materialstui.Model, error) {
+	tr := i18n.New("")
+	if len(trs) > 0 && !trs[0].IsZero() {
+		tr = trs[0]
+	}
 	req, err := requirementsForMaterials(workDir, data)
 	if err != nil {
 		return materialstui.Model{}, err
@@ -645,6 +733,7 @@ func newMaterialsModelWithCreatedDir(workDir string, data any, createdMaterialDi
 		WorkDir:     workDir,
 		MaterialDir: req.MaterialDir,
 		CreatedDir:  createdMaterialDir,
+		I18N:        tr,
 	}), nil
 }
 
@@ -664,7 +753,7 @@ func requirementsForMaterials(workDir string, data any) (contracts.Requirements,
 	return req, nil
 }
 
-func newRequirementsModel() requirementstui.Model {
+func newRequirementsModel(tr i18n.T) requirementstui.Model {
 	return requirementstui.NewModel(contracts.Requirements{
 		Language:          "zh-CN",
 		CitationStyle:     "gbt7714",
@@ -678,7 +767,7 @@ func newRequirementsModel() requirementstui.Model {
 		ResearchQuestions:  []string{},
 		ChapterPreferences: []string{},
 		Constraints:        []string{},
-	})
+	}, requirementstui.Options{I18N: tr})
 }
 
 func resolveWorkDirPath(workDir, path string) string {
@@ -703,7 +792,11 @@ func normalizeRequirementSlices(req *contracts.Requirements) {
 	}
 }
 
-func newSearchModel(workDir string, data any) (searchtui.Model, error) {
+func newSearchModel(workDir string, data any, trs ...i18n.T) (searchtui.Model, error) {
+	tr := i18n.New("")
+	if len(trs) > 0 && !trs[0].IsZero() {
+		tr = trs[0]
+	}
 	materialsResult, ok := data.(materialstui.ScanResult)
 	if !ok {
 		return searchtui.Model{}, fmt.Errorf("invalid data for search screen: expected materialstui.ScanResult")
@@ -718,16 +811,21 @@ func newSearchModel(workDir string, data any) (searchtui.Model, error) {
 		Store:           s,
 		Requirements:    req,
 		MaterialsResult: materialsResult,
+		I18N:            tr,
 	}), nil
 }
 
-func newReferencesModel(workDir string, _ any) (referencestui.Model, error) {
+func newReferencesModel(workDir string, _ any, trs ...i18n.T) (referencestui.Model, error) {
+	tr := i18n.New("")
+	if len(trs) > 0 && !trs[0].IsZero() {
+		tr = trs[0]
+	}
 	s := store.New(workDir)
 	candidates, err := references.LoadCandidates(s)
 	if err != nil {
 		return referencestui.Model{}, fmt.Errorf("load candidates failed: %w", err)
 	}
-	return referencestui.NewModel(candidates), nil
+	return referencestui.NewModel(candidates, referencestui.Options{I18N: tr}), nil
 }
 
 func (m RootModel) updateReferences(key string) (tea.Model, tea.Cmd) {
@@ -769,7 +867,7 @@ func (m RootModel) updateReferences(key string) (tea.Model, tea.Cmd) {
 		// 成功确认，转场到 WritingProgress
 		m.CurrentScreen = ScreenWriting
 		m.ScreenData = result
-		m.Writing = newWritingModel(m.WorkDir, result)
+		m.Writing = newWritingModel(m.WorkDir, result, m.i18n)
 		m.err = nil
 		return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 	}
@@ -777,11 +875,16 @@ func (m RootModel) updateReferences(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func newWritingModel(workDir string, data any) writingtui.Model {
+func newWritingModel(workDir string, data any, trs ...i18n.T) writingtui.Model {
+	tr := i18n.New("")
+	if len(trs) > 0 && !trs[0].IsZero() {
+		tr = trs[0]
+	}
 	opts := writingtui.Options{
 		WorkDir: workDir,
 		Width:   120,
 		Height:  40,
+		I18N:    tr,
 	}
 
 	// Check if this is a recovery scenario
@@ -811,34 +914,41 @@ func (m RootModel) startWritingRuntimeCmd() tea.Cmd {
 	}
 }
 
-func (m RootModel) updateWriting(key string) (tea.Model, tea.Cmd) {
-	m.Writing = m.Writing.UpdateKey(key)
+func (m RootModel) updateWriting(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if msg != nil {
+		updated, cmd := m.Writing.Update(msg)
+		if writingModel, ok := updated.(writingtui.Model); ok {
+			m.Writing = writingModel
+		}
+		if cmd != nil {
+			m.err = m.Writing.Err()
+			return m, cmd
+		}
+	}
 	m.err = m.Writing.Err()
 
 	if m.Writing.Done() && m.Writing.Err() == nil {
 		// Writing completed, transition to ExportSummary and trigger export.
 		m.CurrentScreen = ScreenExportSummary
 		m.ScreenData = nil
-		m.ExportSummary = newExportSummaryModel(m.WorkDir)
+		m.ExportSummary = newExportSummaryModel(m.WorkDir, m.i18n)
 		m.err = nil
 		return m, m.ExportSummary.Init()
 	}
 
 	if m.Writing.Canceled() {
-		// User requested stop, checkpoint should be saved
-		// For now, just quit
 		return m, tea.Quit
 	}
 
 	return m, nil
 }
 
-func newExportSummaryModel(workDir string) exportsummarytui.Model {
-	return exportsummarytui.NewModel(exportsummarytui.Options{WorkDir: workDir})
+func newExportSummaryModel(workDir string, tr i18n.T) exportsummarytui.Model {
+	return exportsummarytui.NewModel(exportsummarytui.Options{WorkDir: workDir, I18N: tr})
 }
 
-func newDoneModel(workDir string, data any) donetui.Model {
-	opts := donetui.Options{WorkDir: workDir}
+func newDoneModel(workDir string, data any, tr i18n.T) donetui.Model {
+	opts := donetui.Options{WorkDir: workDir, I18N: tr}
 	if result, ok := data.(export.Result); ok {
 		opts.Result = result
 	}
@@ -857,7 +967,7 @@ func (m RootModel) updateExportSummary(key string) (tea.Model, tea.Cmd) {
 	if m.ExportSummary.Done() {
 		m.CurrentScreen = ScreenDone
 		m.ScreenData = m.ExportSummary.Result()
-		m.Done = newDoneModel(m.WorkDir, m.ExportSummary.Result())
+		m.Done = newDoneModel(m.WorkDir, m.ExportSummary.Result(), m.i18n)
 		m.err = nil
 		return m, nil
 	}
@@ -884,8 +994,7 @@ func (m RootModel) shouldConfirmExit() bool {
 		// Config wizard handles its own cancellation
 		return false
 	case ScreenWriting:
-		// Writing screen handles its own Ctrl+C for graceful stop
-		return false
+		return true
 	case ScreenRecoverPrompt:
 		// Recovery prompt handles its own exit
 		return false

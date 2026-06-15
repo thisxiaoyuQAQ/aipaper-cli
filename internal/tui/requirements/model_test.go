@@ -25,7 +25,7 @@ func TestModelBuildsValidatedRequirements(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Requirements() error = %v", err)
 	}
-	if req.CitationStyle != "apa" || len(req.SearchProviders) != 2 {
+	if req.CitationStyle != "gbt7714" || req.ArticleTemplate != "zh_course_paper" || len(req.SearchProviders) != 2 {
 		t.Fatalf("requirements = %#v", req)
 	}
 
@@ -44,12 +44,37 @@ func TestModelRejectsInvalidFields(t *testing.T) {
 	})
 
 	_, err := model.Requirements()
-	if err == nil || !strings.Contains(err.Error(), "target words") {
+	if err == nil || !strings.Contains(err.Error(), "目标字数") {
 		t.Fatalf("error = %v", err)
 	}
 	model = model.SetField(FieldTargetWords, "500")
 	_, err = model.Requirements()
-	if err == nil || !strings.Contains(err.Error(), "material dir") {
+	if err == nil || !strings.Contains(err.Error(), "材料目录") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestModelAcceptsReviewPaperTemplate(t *testing.T) {
+	model := NewModel(contracts.Requirements{MaterialDir: t.TempDir(), Language: "zh-CN", TargetWords: 1200})
+	model = model.SetField(FieldTopic, "原神与鸣潮比较")
+	model = model.SetField(FieldArticleTemplate, "review_paper")
+
+	req, err := model.Requirements()
+	if err != nil {
+		t.Fatalf("Requirements() error = %v", err)
+	}
+	if req.ArticleTemplate != "review_paper" || req.CitationStyle != "gbt7714" {
+		t.Fatalf("requirements = %#v", req)
+	}
+}
+
+func TestModelRejectsInvalidArticleTemplate(t *testing.T) {
+	model := NewModel(contracts.Requirements{MaterialDir: t.TempDir(), Language: "zh-CN", TargetWords: 1200})
+	model = model.SetField(FieldTopic, "模板校验")
+	model = model.SetField(FieldArticleTemplate, "review-paper")
+
+	_, err := model.Requirements()
+	if err == nil || !strings.Contains(err.Error(), "文章模板") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -78,7 +103,7 @@ func TestModelNavigationEditAndToggle(t *testing.T) {
 	if model.FieldValue(FieldAllowOnlineSearch) != "true" {
 		t.Fatalf("toggled allow online = %q", model.FieldValue(FieldAllowOnlineSearch))
 	}
-	if !strings.Contains(model.View(), "Writing requirements") {
+	if !strings.Contains(model.View(), "写作需求") {
 		t.Fatalf("view = %s", model.View())
 	}
 }

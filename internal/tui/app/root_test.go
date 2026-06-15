@@ -162,7 +162,7 @@ func TestRootModelRequirementsSubmitCreatesCustomMaterialDir(t *testing.T) {
 	if root.Materials.Status() != materialstui.StatusEmpty || !root.Materials.CreatedDir() {
 		t.Fatalf("materials status=%q created=%v view:\n%s", root.Materials.Status(), root.Materials.CreatedDir(), root.View())
 	}
-	if !strings.Contains(root.View(), "was created") {
+	if !strings.Contains(root.View(), "材料目录已创建") {
 		t.Fatalf("View() = %q, want created prompt", root.View())
 	}
 
@@ -324,7 +324,7 @@ func TestRootModelRequirementsSubmitRejectsInvalidInput(t *testing.T) {
 	if root.CurrentScreen != ScreenRequirements {
 		t.Fatalf("CurrentScreen = %q, want %q", root.CurrentScreen, ScreenRequirements)
 	}
-	if root.Err() == nil || !strings.Contains(root.Err().Error(), "topic") {
+	if root.Err() == nil || !strings.Contains(root.Err().Error(), "主题") {
 		t.Fatalf("Err() = %v, want topic validation error", root.Err())
 	}
 	if _, err := os.Stat(store.New(workDir).RequirementsPath()); !os.IsNotExist(err) {

@@ -121,8 +121,8 @@ func TestCustomConfigRequiresBaseURL(t *testing.T) {
 	model = model.SetField(FieldModel, "custom-model")
 
 	_, err := model.Config()
-	if err == nil || !strings.Contains(err.Error(), "base url") {
-		t.Fatalf("Config() error = %v, want base url error", err)
+	if err == nil || !strings.Contains(err.Error(), "基础地址") {
+		t.Fatalf("Config() error = %v, want 基础地址 error", err)
 	}
 }
 

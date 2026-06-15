@@ -3,52 +3,57 @@ package requirements
 import (
 	"fmt"
 	"strings"
+
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 )
 
 func (m Model) View() string {
 	var b strings.Builder
-	b.WriteString("Writing requirements\n\n")
+	b.WriteString(m.i18n.Text(i18n.RequirementsTitle))
+	b.WriteString("\n\n")
 	for i, field := range orderedFields {
 		cursor := " "
 		if i == m.cursor {
 			cursor = ">"
 		}
 		value := strings.ReplaceAll(m.values[field], "\n", " / ")
-		fmt.Fprintf(&b, "%s %s: %s\n", cursor, fieldLabel(field), value)
+		fmt.Fprintf(&b, "%s %s: %s\n", cursor, m.fieldLabel(field), value)
 	}
 	if m.err != nil {
-		fmt.Fprintf(&b, "\nError: %s\n", m.err)
+		fmt.Fprintf(&b, "\n%s: %s\n", m.i18n.Text(i18n.CommonErrorPrefix), m.err)
 	}
 	return b.String()
 }
 
-func fieldLabel(field Field) string {
+func (m Model) fieldLabel(field Field) string {
 	switch field {
 	case FieldTopic:
-		return "Topic"
+		return m.i18n.Text(i18n.RequirementsFieldTopic)
 	case FieldResearchQuestions:
-		return "Research questions"
+		return m.i18n.Text(i18n.RequirementsFieldResearchQuestions)
 	case FieldScope:
-		return "Scope"
+		return m.i18n.Text(i18n.RequirementsFieldScope)
 	case FieldLanguage:
-		return "Language"
+		return m.i18n.Text(i18n.RequirementsFieldLanguage)
 	case FieldCitationStyle:
-		return "Citation style"
+		return m.i18n.Text(i18n.RequirementsFieldCitationStyle)
+	case FieldArticleTemplate:
+		return m.i18n.Text(i18n.RequirementsFieldArticleTemplate)
 	case FieldQualityMode:
-		return "Quality mode"
+		return m.i18n.Text(i18n.RequirementsFieldQualityMode)
 	case FieldTargetWords:
-		return "Target words"
+		return m.i18n.Text(i18n.RequirementsFieldTargetWords)
 	case FieldMaterialDir:
-		return "Material dir"
+		return m.i18n.Text(i18n.RequirementsFieldMaterialDir)
 	case FieldAllowOnlineSearch:
-		return "Allow online search"
+		return m.i18n.Text(i18n.RequirementsFieldAllowOnlineSearch)
 	case FieldSearchProviders:
-		return "Search providers"
+		return m.i18n.Text(i18n.RequirementsFieldSearchProviders)
 	case FieldChapterPreferences:
-		return "Chapter preferences"
+		return m.i18n.Text(i18n.RequirementsFieldChapterPreferences)
 	case FieldConstraints:
-		return "Constraints"
+		return m.i18n.Text(i18n.RequirementsFieldConstraints)
 	default:
-		return "Unknown"
+		return m.i18n.Text(i18n.CommonUnknown)
 	}
 }

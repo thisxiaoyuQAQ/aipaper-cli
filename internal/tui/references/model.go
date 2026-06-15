@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 )
 
@@ -18,6 +19,10 @@ const (
 	SortTitle
 )
 
+type Options struct {
+	I18N i18n.T
+}
+
 type Model struct {
 	candidates []contracts.ReferenceCandidate
 	cursor     int
@@ -29,14 +34,20 @@ type Model struct {
 	done       bool
 	canceled   bool
 	err        error
+	i18n       i18n.T
 }
 
-func NewModel(candidates contracts.ReferenceCandidates) Model {
+func NewModel(candidates contracts.ReferenceCandidates, opts ...Options) Model {
+	tr := i18n.New("")
+	if len(opts) > 0 && !opts[0].I18N.IsZero() {
+		tr = opts[0].I18N
+	}
 	items := append([]contracts.ReferenceCandidate(nil), candidates.Items...)
 	return Model{
 		candidates: items,
 		selected:   map[string]bool{},
 		rejected:   map[string]bool{},
+		i18n:       tr,
 	}
 }
 
@@ -72,7 +83,7 @@ func (m Model) UpdateKey(key string) Model {
 		m.toggleRejected()
 	case "enter":
 		if len(m.selected) == 0 {
-			m.err = references.ConfirmError{Code: references.CodeNoneConfirmed, Message: "at least one reference must be confirmed"}
+			m.err = references.ConfirmError{Code: references.CodeNoneConfirmed, Message: m.i18n.Text(i18n.ReferencesErrNone)}
 			return m
 		}
 		m.done = true

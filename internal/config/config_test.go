@@ -10,8 +10,10 @@ import (
 
 func TestMergeDeepMergesProviderAndRoleConfig(t *testing.T) {
 	base := Config{
-		Provider: "openrouter",
-		Model:    "base-model",
+		Provider:        "openrouter",
+		Model:           "base-model",
+		UILanguage:      "zh-CN",
+		DefaultLanguage: "zh-CN",
 		Providers: map[string]ProviderConfig{
 			"openrouter": {
 				Type:    "openai-compatible",
@@ -26,7 +28,8 @@ func TestMergeDeepMergesProviderAndRoleConfig(t *testing.T) {
 		},
 	}
 	override := Config{
-		Model: "override-model",
+		Model:      "override-model",
+		UILanguage: "en",
 		Providers: map[string]ProviderConfig{
 			"openrouter": {
 				Models: []string{"override-model"},
@@ -40,7 +43,7 @@ func TestMergeDeepMergesProviderAndRoleConfig(t *testing.T) {
 
 	merged := Merge(base, override)
 
-	if merged.Provider != "openrouter" || merged.Model != "override-model" {
+	if merged.Provider != "openrouter" || merged.Model != "override-model" || merged.UILanguage != "en" || merged.DefaultLanguage != "zh-CN" {
 		t.Fatalf("unexpected top-level merge: %#v", merged)
 	}
 	provider := merged.Providers["openrouter"]
@@ -159,7 +162,7 @@ func TestLoadMergesGlobalProjectAndExplicitConfigInOrder(t *testing.T) {
 	if !reflect.DeepEqual(loaded, wantLoaded) {
 		t.Fatalf("loaded = %#v, want %#v", loaded, wantLoaded)
 	}
-	if cfg.Provider != "openrouter" || cfg.Model != "project-model" || cfg.DefaultLanguage != "zh-CN" {
+	if cfg.Provider != "openrouter" || cfg.Model != "project-model" || cfg.DefaultLanguage != "zh-CN" || cfg.UILanguage != "zh-CN" {
 		t.Fatalf("unexpected merged config: %#v", cfg)
 	}
 	provider := cfg.Providers["openrouter"]
@@ -212,8 +215,30 @@ func TestSaveProjectWritesLoadableConfig(t *testing.T) {
 	if !reflect.DeepEqual(paths, []string{path}) {
 		t.Fatalf("loaded paths = %#v, want %#v", paths, []string{path})
 	}
-	if loaded.Provider != cfg.Provider || loaded.Model != cfg.Model {
+	if loaded.Provider != cfg.Provider || loaded.Model != cfg.Model || loaded.UILanguage != "zh-CN" {
 		t.Fatalf("loaded config = %#v", loaded)
+	}
+}
+
+func TestLoadCanonicalizesUILanguageAliases(t *testing.T) {
+	home := t.TempDir()
+	workDir := t.TempDir()
+	setHome(t, home)
+	writeFile(t, ProjectPath(workDir), `{"ui_language":"english"}`)
+
+	loaded, _, err := Load(LoadOptions{WorkDir: workDir})
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if loaded.UILanguage != "en" {
+		t.Fatalf("UILanguage = %q, want en", loaded.UILanguage)
+	}
+}
+
+func TestValidateRejectsInvalidUILanguage(t *testing.T) {
+	err := Config{UILanguage: "fr"}.Validate()
+	if err == nil || !strings.Contains(err.Error(), "ui_language") {
+		t.Fatalf("Validate() error = %v, want ui_language error", err)
 	}
 }
 

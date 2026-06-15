@@ -97,13 +97,13 @@ func TestRootModel_View_ShowsExitConfirmation(t *testing.T) {
 	view := m.View()
 
 	// Should show exit confirmation message
-	if !strings.Contains(view, "Exit") {
-		t.Errorf("view should contain 'Exit' when exitConfirm=true")
+	if !strings.Contains(view, "退出") {
+		t.Errorf("view should contain '退出' when exitConfirm=true")
 	}
-	if !strings.Contains(view, "[Y]") && !strings.Contains(view, "Yes") {
+	if !strings.Contains(view, "[Y]") && !strings.Contains(view, "是") {
 		t.Errorf("view should contain 'Yes' option")
 	}
-	if !strings.Contains(view, "[N]") && !strings.Contains(view, "No") {
+	if !strings.Contains(view, "[N]") && !strings.Contains(view, "否") {
 		t.Errorf("view should contain 'No' option")
 	}
 }
@@ -129,15 +129,15 @@ func TestRootModel_ScreenTransition_ClearsExitConfirm(t *testing.T) {
 	}
 }
 
-func TestRootModel_WritingScreen_NoExitConfirm(t *testing.T) {
+func TestRootModel_WritingScreen_UsesExitConfirm(t *testing.T) {
 	m := NewRootModel(RootOptions{
 		WorkDir:       ".",
 		InitialScreen: ScreenWriting,
 	})
 
-	// Writing screen should not require exit confirmation (it handles Ctrl+C itself)
-	if m.shouldConfirmExit() {
-		t.Errorf("expected shouldConfirmExit()=false for WritingScreen")
+	// Writing screen now uses Ctrl+C for program exit confirmation; Esc handles pause.
+	if !m.shouldConfirmExit() {
+		t.Errorf("expected shouldConfirmExit()=true for WritingScreen")
 	}
 }
 
@@ -173,7 +173,7 @@ func TestRootModel_shouldConfirmExit_ReturnsCorrectly(t *testing.T) {
 	}{
 		{ScreenRequirements, false, "Requirements with no changes"},
 		{ScreenReferences, false, "References with no changes"},
-		{ScreenWriting, false, "Writing handles its own Ctrl+C"},
+		{ScreenWriting, true, "Writing uses Ctrl+C exit confirmation"},
 		{ScreenRecoverPrompt, false, "RecoverPrompt handles its own exit"},
 		{ScreenConfigWizard, false, "ConfigWizard handles its own exit"},
 		{ScreenMaterialsScan, false, "MaterialsScan allows quick exit"},

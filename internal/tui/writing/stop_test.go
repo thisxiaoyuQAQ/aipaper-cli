@@ -5,92 +5,68 @@ import (
 	"time"
 )
 
-func TestModel_StopRequest_SetsStoppingState(t *testing.T) {
+func TestModel_EscRequest_SetsPauseRequestedState(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
 
-	// Initially running
-	if !m.running {
-		t.Errorf("expected model to start in running state")
-	}
-	if m.stopping {
-		t.Errorf("expected stopping=false initially")
-	}
-	if m.stopRequested {
-		t.Errorf("expected stopRequested=false initially")
-	}
-
-	// Press Ctrl+C to request stop
-	updated, _ := m.handleKey("ctrl+c")
+	updated, cmd := m.handleKey("esc")
 	m = updated.(Model)
 
-	if !m.stopping {
-		t.Errorf("expected stopping=true after ctrl+c")
+	if !m.pauseRequested {
+		t.Errorf("expected pauseRequested=true after esc")
 	}
-	if !m.stopRequested {
-		t.Errorf("expected stopRequested=true after ctrl+c")
+	if m.paused {
+		t.Errorf("expected paused=false until runtime reaches safe boundary")
 	}
 	if !m.running {
-		t.Errorf("expected running=true while stopping")
+		t.Errorf("expected running=true while waiting for safe boundary")
 	}
-	if m.canceled {
-		t.Errorf("expected canceled=false until checkpoint saved")
+	if cmd == nil {
+		t.Fatalf("expected pause command")
+	}
+	if _, ok := cmd().(RuntimePauseRequestedMsg); !ok {
+		t.Fatalf("expected RuntimePauseRequestedMsg")
 	}
 }
 
-func TestModel_StopRequest_IgnoresSecondCtrlC(t *testing.T) {
+func TestModel_EscRequest_IgnoresSecondEsc(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
 
-	// First Ctrl+C
-	updated, _ := m.handleKey("ctrl+c")
+	updated, _ := m.handleKey("esc")
 	m = updated.(Model)
-	if !m.stopping {
-		t.Errorf("expected stopping=true after first ctrl+c")
-	}
+	updated, cmd := m.handleKey("esc")
+	m = updated.(Model)
 
-	// Second Ctrl+C should be ignored (not quit immediately)
-	updated, cmd := m.handleKey("ctrl+c")
-	m = updated.(Model)
 	if cmd != nil {
-		t.Errorf("expected nil cmd for second ctrl+c while stopping")
+		t.Errorf("expected nil cmd for second esc while pause requested")
 	}
-	if !m.stopping {
-		t.Errorf("expected stopping=true to persist")
+	if !m.pauseRequested {
+		t.Errorf("expected pauseRequested=true to persist")
 	}
 }
 
-func TestModel_CheckpointSaved_CompletesStop(t *testing.T) {
+func TestModel_PausedEvent_CompletesPause(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
-
-	// Request stop
-	updated, _ := m.handleKey("ctrl+c")
+	updated, _ := m.handleKey("esc")
 	m = updated.(Model)
 
-	// Simulate checkpoint saved event
-	ev := RuntimeEvent{
-		At:   time.Now(),
-		Kind: EventCheckpointSaved,
-	}
-	m.handleRuntimeEvent(ev)
+	m.handleRuntimeEvent(RuntimeEvent{At: time.Now(), Kind: EventPaused})
 
-	if m.running {
-		t.Errorf("expected running=false after checkpoint saved during stop")
+	if !m.paused {
+		t.Errorf("expected paused=true after paused event")
 	}
-	if !m.canceled {
-		t.Errorf("expected canceled=true after checkpoint saved during stop")
+	if m.pauseRequested {
+		t.Errorf("expected pauseRequested=false after paused event")
+	}
+	if !m.running {
+		t.Errorf("expected runtime to remain alive while paused")
 	}
 }
 
 func TestModel_CheckpointSaved_WithoutStopRequest(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
 
-	// Simulate checkpoint saved event without stop request
-	ev := RuntimeEvent{
-		At:   time.Now(),
-		Kind: EventCheckpointSaved,
-	}
-	m.handleRuntimeEvent(ev)
+	m.handleRuntimeEvent(RuntimeEvent{At: time.Now(), Kind: EventCheckpointSaved})
 
-	// Should remain running
 	if !m.running {
 		t.Errorf("expected running=true when checkpoint saved without stop request")
 	}
@@ -99,129 +75,71 @@ func TestModel_CheckpointSaved_WithoutStopRequest(t *testing.T) {
 	}
 }
 
-func TestModel_Canceled_ReturnsTrue_AfterStopComplete(t *testing.T) {
+func TestModel_EnterResumesWhenPaused(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
+	m.handleRuntimeEvent(RuntimeEvent{At: time.Now(), Kind: EventPaused})
 
-	// Request stop
-	updated, _ := m.handleKey("ctrl+c")
+	updated, cmd := m.handleKey("enter")
 	m = updated.(Model)
 
-	if m.Canceled() {
-		t.Errorf("expected Canceled()=false before checkpoint saved")
-	}
-
-	// Simulate checkpoint saved
-	ev := RuntimeEvent{
-		At:   time.Now(),
-		Kind: EventCheckpointSaved,
-	}
-	m.handleRuntimeEvent(ev)
-
-	if !m.Canceled() {
-		t.Errorf("expected Canceled()=true after stop complete")
-	}
-}
-
-func TestModel_StopRequest_AddsLogEntry(t *testing.T) {
-	m := NewModel(Options{Width: 120, Height: 40})
-
-	// Request stop
-	updated, _ := m.handleKey("ctrl+c")
-	m = updated.(Model)
-
-	// Should have log entry about stop request
-	found := false
-	for _, entry := range m.logs {
-		if entry.role == "system" && contains(entry.message, "Stop requested") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected log entry about stop request")
-	}
-}
-
-func TestModel_CheckpointSavedDuringStop_AddsSuccessLog(t *testing.T) {
-	m := NewModel(Options{Width: 120, Height: 40})
-
-	// Request stop
-	updated, _ := m.handleKey("ctrl+c")
-	m = updated.(Model)
-
-	// Simulate checkpoint saved
-	ev := RuntimeEvent{
-		At:   time.Now(),
-		Kind: EventCheckpointSaved,
-	}
-	m.handleRuntimeEvent(ev)
-
-	// Should have log entry about progress saved
-	found := false
-	for _, entry := range m.logs {
-		if entry.role == "system" && contains(entry.message, "Progress saved") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected log entry about progress saved")
-	}
-}
-
-func TestModel_CtrlC_QuitsWhenNotRunning(t *testing.T) {
-	m := NewModel(Options{Width: 120, Height: 40})
-	m.running = false
-
-	// Ctrl+C when not running should quit
-	_, cmd := m.handleKey("ctrl+c")
 	if cmd == nil {
-		t.Errorf("expected quit command when not running")
+		t.Fatalf("expected resume command")
+	}
+	if _, ok := cmd().(RuntimeResumeRequestedMsg); !ok {
+		t.Fatalf("expected RuntimeResumeRequestedMsg")
 	}
 }
 
-func TestModel_Stopping_ReturnsTrue_DuringStop(t *testing.T) {
+func TestModel_InstructionSubmit_AddsPendingAndCommand(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
+	m.input = "请更强调实验设计"
 
-	if m.Stopping() {
-		t.Errorf("expected Stopping()=false initially")
-	}
-
-	// Request stop
-	updated, _ := m.handleKey("ctrl+c")
+	updated, cmd := m.handleKey("enter")
 	m = updated.(Model)
 
-	if !m.Stopping() {
-		t.Errorf("expected Stopping()=true after stop request")
+	if cmd == nil {
+		t.Fatalf("expected instruction command")
+	}
+	msg, ok := cmd().(RuntimeInstructionSubmittedMsg)
+	if !ok {
+		t.Fatalf("expected RuntimeInstructionSubmittedMsg")
+	}
+	if msg.Text != "请更强调实验设计" {
+		t.Fatalf("instruction text = %q", msg.Text)
+	}
+	if m.input != "" {
+		t.Fatalf("expected input to be cleared")
+	}
+	if m.pendingInstructions != 1 {
+		t.Fatalf("pendingInstructions = %d, want 1", m.pendingInstructions)
 	}
 }
 
-func TestModel_StopRequested_ReturnsTrue_AfterCtrlC(t *testing.T) {
+func TestModel_CtrlC_DoesNotPause(t *testing.T) {
 	m := NewModel(Options{Width: 120, Height: 40})
-
-	if m.StopRequested() {
-		t.Errorf("expected StopRequested()=false initially")
-	}
-
-	// Request stop
-	updated, _ := m.handleKey("ctrl+c")
+	updated, cmd := m.handleKey("ctrl+c")
 	m = updated.(Model)
 
-	if !m.StopRequested() {
-		t.Errorf("expected StopRequested()=true after ctrl+c")
+	if cmd != nil {
+		t.Fatalf("expected writing model not to handle ctrl+c")
+	}
+	if m.StopRequested() || m.Stopping() || m.PauseRequested() {
+		t.Fatalf("ctrl+c should be owned by RootModel exit handling")
 	}
 }
 
-// Helper function
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
+func TestModel_PauseAccessors(t *testing.T) {
+	m := NewModel(Options{Width: 120, Height: 40})
+	if m.PauseRequested() || m.Paused() {
+		t.Fatalf("expected initial pause state to be false")
 	}
-	return false
+	updated, _ := m.handleKey("esc")
+	m = updated.(Model)
+	if !m.PauseRequested() {
+		t.Fatalf("expected PauseRequested()=true after esc")
+	}
+	m.handleRuntimeEvent(RuntimeEvent{At: time.Now(), Kind: EventPaused})
+	if !m.Paused() {
+		t.Fatalf("expected Paused()=true after paused event")
+	}
 }

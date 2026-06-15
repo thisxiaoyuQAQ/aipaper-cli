@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 	domainsearch "github.com/thisxiaoyuQAQ/aipaper-cli/internal/search"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
@@ -43,6 +44,7 @@ type Options struct {
 	Requirements    contracts.Requirements
 	MaterialsResult materialstui.ScanResult
 	Search          SearchFunc
+	I18N            i18n.T
 }
 
 type Model struct {
@@ -61,6 +63,7 @@ type Model struct {
 
 	action Action
 	err    error
+	i18n   i18n.T
 }
 
 type SearchFinishedMsg struct {
@@ -81,6 +84,10 @@ func NewModel(opts Options) Model {
 	if searchFn == nil {
 		searchFn = domainsearch.Run
 	}
+	tr := opts.I18N
+	if tr.IsZero() {
+		tr = i18n.New("")
+	}
 	return Model{
 		workDir:         workDir,
 		store:           s,
@@ -89,6 +96,7 @@ func NewModel(opts Options) Model {
 		search:          searchFn,
 		status:          StatusSearching,
 		materialCount:   len(opts.MaterialsResult.Candidates),
+		i18n:            tr,
 	}
 }
 
@@ -205,7 +213,7 @@ func (m *Model) applySearchFinished(msg SearchFinishedMsg) {
 	outputs, err := references.WriteCandidates(m.store, m.finalCandidates)
 	if err != nil {
 		m.status = StatusError
-		m.err = fmt.Errorf("write candidates failed: %w", err)
+		m.err = fmt.Errorf(m.i18n.Text(i18n.SearchErrWriteCandidates), err)
 		return
 	}
 	m.searchOutputs = outputs
@@ -228,8 +236,11 @@ func (m Model) searchCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		result, err := searchFn(ctx, s, domainsearch.Options{
-			Requirements: requirements,
-			Limit:        10,
+			Requirements:      requirements,
+			Limit:             10,
+			ExpansionEnabled:  true,
+			MinCandidateCount: 10,
+			ExpansionLimit:    3,
 		})
 		return SearchFinishedMsg{Result: result, Err: err}
 	}

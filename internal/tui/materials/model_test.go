@@ -33,7 +33,7 @@ func TestModelMissingDirectoryCreatesAndPrompts(t *testing.T) {
 	if info, err := os.Stat(materialDir); err != nil || !info.IsDir() {
 		t.Fatalf("material dir was not created: info=%v err=%v", info, err)
 	}
-	if !strings.Contains(updated.View(), "was created") {
+	if !strings.Contains(updated.View(), "材料目录已创建") {
 		t.Fatalf("View() = %q, want created prompt", updated.View())
 	}
 }
@@ -103,8 +103,8 @@ func TestModelShowsDegradedFormats(t *testing.T) {
 		t.Fatalf("Stats().Degraded = %d, want 2", updated.Stats().Degraded)
 	}
 	updated, _ = updated.UpdateKey("d")
-	if !updated.Details() || !strings.Contains(updated.View(), "degraded") {
-		t.Fatalf("details view = %q, want degraded item details", updated.View())
+	if !updated.Details() || !strings.Contains(updated.View(), "降级") {
+		t.Fatalf("details view = %q, want 降级 item details", updated.View())
 	}
 }
 

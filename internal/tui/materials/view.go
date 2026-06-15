@@ -5,34 +5,42 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 )
 
 func (m Model) View() string {
 	var b strings.Builder
-	b.WriteString("Materials scan\n\n")
-	fmt.Fprintf(&b, "Directory: %s\n", m.displayDir)
+	b.WriteString(m.i18n.Text(i18n.MaterialsTitle))
+	b.WriteString("\n\n")
+	fmt.Fprintf(&b, "%s: %s\n", m.i18n.Text(i18n.MaterialsDirectory), m.displayDir)
 
 	switch m.status {
 	case StatusScanning:
-		b.WriteString("Status: scanning materials...\n")
+		b.WriteString(m.i18n.Text(i18n.MaterialsStatusScanning))
+		b.WriteString("\n")
 	case StatusEmpty:
 		if m.createdDir {
-			b.WriteString("Status: material directory was created. Add files, then press Enter to scan.\n")
+			b.WriteString(m.i18n.Text(i18n.MaterialsStatusCreated))
 		} else {
-			b.WriteString("Status: no material files found. Add files, then press Enter to scan.\n")
+			b.WriteString(m.i18n.Text(i18n.MaterialsStatusEmpty))
 		}
+		b.WriteString("\n")
 	case StatusComplete:
-		b.WriteString("Status: scan complete.\n")
+		b.WriteString(m.i18n.Text(i18n.MaterialsStatusComplete))
+		b.WriteString("\n")
 	case StatusAllFailed:
-		b.WriteString("Status: no material could be parsed.\n")
+		b.WriteString(m.i18n.Text(i18n.MaterialsStatusAllFailed))
+		b.WriteString("\n")
 	case StatusError:
-		b.WriteString("Status: scan failed.\n")
+		b.WriteString(m.i18n.Text(i18n.MaterialsStatusError))
+		b.WriteString("\n")
 	}
 
 	if m.stats.Total > 0 || m.stats.Candidates > 0 {
 		fmt.Fprintf(
 			&b,
-			"\nParsed: %d  Degraded: %d  Failed: %d  Skipped: %d  Candidates: %d\n",
+			"\n"+m.i18n.Text(i18n.MaterialsStatsLine)+"\n",
 			m.stats.Parsed,
 			m.stats.Degraded,
 			m.stats.Failed,
@@ -41,11 +49,13 @@ func (m Model) View() string {
 		)
 	}
 	if m.details && len(m.manifest.Items) > 0 {
-		b.WriteString("\nDetails\n")
+		b.WriteString("\n")
+		b.WriteString(m.i18n.Text(i18n.MaterialsDetails))
+		b.WriteString("\n")
 		for _, item := range m.manifest.Items {
 			line := fmt.Sprintf("- %s %s [%s/%s]", item.ID, safeDisplayPath(item.Path), item.Kind, item.Status)
 			if item.Degraded {
-				line += " degraded"
+				line += " " + m.i18n.Text(i18n.MaterialsDegraded)
 			}
 			if item.Error != "" {
 				line += ": " + safeDisplayError(item.Error)
@@ -55,10 +65,12 @@ func (m Model) View() string {
 		}
 	}
 	if m.err != nil {
-		fmt.Fprintf(&b, "\nError: %s\n", safeDisplayError(m.err.Error()))
+		fmt.Fprintf(&b, "\n%s: %s\n", m.i18n.Text(i18n.CommonErrorPrefix), safeDisplayError(m.err.Error()))
 	}
 
-	b.WriteString("\nEnter: continue/rescan  r: rescan  d: details  b: requirements  s: skip  q: quit\n")
+	b.WriteString("\n")
+	b.WriteString(m.i18n.Text(i18n.MaterialsFooter))
+	b.WriteString("\n")
 	return b.String()
 }
 

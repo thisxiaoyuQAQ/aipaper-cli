@@ -59,12 +59,12 @@ func TestStateProbe_DetectsQualityArtifacts(t *testing.T) {
 	// Create minimal requirements
 	materialsDir := filepath.Join(dir, "materials")
 	req := contracts.Requirements{
-		Topic:       "test",
-		Language:    "en",
+		Topic:         "test",
+		Language:      "en",
 		CitationStyle: "apa",
-		TargetWords: 1000,
-		MaterialDir: materialsDir,
-		QualityMode: "enhanced",
+		TargetWords:   1000,
+		MaterialDir:   materialsDir,
+		QualityMode:   "enhanced",
 	}
 	if err := os.MkdirAll(materialsDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -114,11 +114,11 @@ func TestStateProbe_QualityMode_DefaultsToEnhanced(t *testing.T) {
 	// Create requirements without quality_mode field
 	materialsDir := filepath.Join(dir, "materials")
 	req := contracts.Requirements{
-		Topic:       "test",
-		Language:    "en",
+		Topic:         "test",
+		Language:      "en",
 		CitationStyle: "apa",
-		TargetWords: 1000,
-		MaterialDir: materialsDir,
+		TargetWords:   1000,
+		MaterialDir:   materialsDir,
 		// QualityMode intentionally omitted
 	}
 	if err := os.MkdirAll(materialsDir, 0o755); err != nil {
@@ -155,12 +155,12 @@ func TestStateProbe_NoQualityArtifacts_CompatibilityMode(t *testing.T) {
 	// Create requirements with enhanced mode
 	materialsDir := filepath.Join(dir, "materials")
 	req := contracts.Requirements{
-		Topic:       "test",
-		Language:    "en",
+		Topic:         "test",
+		Language:      "en",
 		CitationStyle: "apa",
-		TargetWords: 1000,
-		MaterialDir: materialsDir,
-		QualityMode: "enhanced",
+		TargetWords:   1000,
+		MaterialDir:   materialsDir,
+		QualityMode:   "enhanced",
 	}
 	if err := os.MkdirAll(materialsDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -206,12 +206,12 @@ func TestStateProbe_QualityMode_AllModes(t *testing.T) {
 
 			materialsDir := filepath.Join(dir, "materials")
 			req := contracts.Requirements{
-				Topic:       "test",
-				Language:    "en",
+				Topic:         "test",
+				Language:      "en",
 				CitationStyle: "apa",
-				TargetWords: 1000,
-				MaterialDir: materialsDir,
-				QualityMode: mode,
+				TargetWords:   1000,
+				MaterialDir:   materialsDir,
+				QualityMode:   mode,
 			}
 			if err := os.MkdirAll(materialsDir, 0o755); err != nil {
 				t.Fatal(err)

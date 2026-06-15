@@ -5,14 +5,17 @@ import (
 	"strings"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 )
 
 func (m Model) View() string {
 	var b strings.Builder
-	b.WriteString("aipaper-cli\n\n")
+	b.WriteString(m.i18n.Text(i18n.ConfigTitle))
+	b.WriteString("\n\n")
 	switch m.step {
 	case StepTemplate:
-		b.WriteString("Provider template\n\n")
+		b.WriteString(m.i18n.Text(i18n.ConfigProviderTemplate))
+		b.WriteString("\n\n")
 		for i, template := range DefaultTemplates() {
 			cursor := " "
 			if i == m.templateIdx {
@@ -21,27 +24,33 @@ func (m Model) View() string {
 			fmt.Fprintf(&b, "%s %s\n", cursor, template.Name)
 		}
 	case StepFields:
-		b.WriteString("Provider settings\n\n")
+		b.WriteString(m.i18n.Text(i18n.ConfigProviderSettings))
+		b.WriteString("\n\n")
 		for i, field := range orderedFields {
 			cursor := " "
 			if i == m.cursor {
 				cursor = ">"
 			}
-			fmt.Fprintf(&b, "%s %s: %s\n", cursor, fieldLabel(field), m.displayField(field))
+			fmt.Fprintf(&b, "%s %s: %s\n", cursor, m.fieldLabel(field), m.displayField(field))
 		}
 		if m.directSecret {
-			b.WriteString("\nAPI key will be saved directly. Prefer an env: reference.\n")
+			b.WriteString("\n")
+			b.WriteString(m.i18n.Text(i18n.ConfigDirectSecretWarning))
+			b.WriteString("\n")
 		}
 	case StepSummary:
-		b.WriteString("Configuration summary\n\n")
+		b.WriteString(m.i18n.Text(i18n.ConfigSummaryTitle))
+		b.WriteString("\n\n")
 		b.WriteString(m.Summary())
 		b.WriteString("\n")
 		if m.directSecret {
-			b.WriteString("\nAPI key will be saved directly. Prefer an env: reference.\n")
+			b.WriteString("\n")
+			b.WriteString(m.i18n.Text(i18n.ConfigDirectSecretWarning))
+			b.WriteString("\n")
 		}
 	}
 	if m.err != nil {
-		fmt.Fprintf(&b, "\nError: %s\n", m.err)
+		fmt.Fprintf(&b, "\n%s: %s\n", m.i18n.Text(i18n.CommonErrorPrefix), m.err)
 	}
 	return b.String()
 }
@@ -54,23 +63,25 @@ func (m Model) displayField(field Field) string {
 	return value
 }
 
-func fieldLabel(field Field) string {
+func (m Model) fieldLabel(field Field) string {
 	switch field {
 	case FieldProviderName:
-		return "Provider name"
+		return m.i18n.Text(i18n.ConfigFieldProviderName)
 	case FieldProviderType:
-		return "Provider type"
+		return m.i18n.Text(i18n.ConfigFieldProviderType)
 	case FieldBaseURL:
-		return "Base URL"
+		return m.i18n.Text(i18n.ConfigFieldBaseURL)
 	case FieldModel:
-		return "Model"
+		return m.i18n.Text(i18n.ConfigFieldModel)
 	case FieldAPIKey:
-		return "API key"
+		return m.i18n.Text(i18n.ConfigFieldAPIKey)
 	case FieldDefaultLanguage:
-		return "Default language"
+		return m.i18n.Text(i18n.ConfigFieldDefaultLanguage)
+	case FieldUILanguage:
+		return m.i18n.Text(i18n.ConfigFieldUILanguage)
 	case FieldCitationStyle:
-		return "Citation style"
+		return m.i18n.Text(i18n.ConfigFieldCitationStyle)
 	default:
-		return "Unknown"
+		return m.i18n.Text(i18n.CommonUnknown)
 	}
 }

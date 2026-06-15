@@ -10,18 +10,23 @@ import (
 type RuntimeEventKind string
 
 const (
-	EventStepStarted     RuntimeEventKind = "step_started"
-	EventStepDone        RuntimeEventKind = "step_done"
-	EventStepFailed      RuntimeEventKind = "step_failed"
-	EventRoleLog         RuntimeEventKind = "role_log"
-	EventContentDelta    RuntimeEventKind = "content_delta"
-	EventUsageUpdate     RuntimeEventKind = "usage_update"
-	EventChapterStatus   RuntimeEventKind = "chapter_status"
-	EventQualityReview   RuntimeEventKind = "quality_review"
-	EventCheckpointSaved RuntimeEventKind = "checkpoint_saved"
-	EventExportArtifact  RuntimeEventKind = "export_artifact"
-	EventRuntimeDone     RuntimeEventKind = "runtime_done"
-	EventRuntimeError    RuntimeEventKind = "runtime_error"
+	EventStepStarted        RuntimeEventKind = "step_started"
+	EventStepDone           RuntimeEventKind = "step_done"
+	EventStepFailed         RuntimeEventKind = "step_failed"
+	EventRoleLog            RuntimeEventKind = "role_log"
+	EventContentDelta       RuntimeEventKind = "content_delta"
+	EventUsageUpdate        RuntimeEventKind = "usage_update"
+	EventChapterStatus      RuntimeEventKind = "chapter_status"
+	EventQualityReview      RuntimeEventKind = "quality_review"
+	EventCheckpointSaved    RuntimeEventKind = "checkpoint_saved"
+	EventExportArtifact     RuntimeEventKind = "export_artifact"
+	EventRuntimeDone        RuntimeEventKind = "runtime_done"
+	EventRuntimeError       RuntimeEventKind = "runtime_error"
+	EventPauseRequested     RuntimeEventKind = "pause_requested"
+	EventPaused             RuntimeEventKind = "paused"
+	EventResumed            RuntimeEventKind = "resumed"
+	EventInstructionQueued  RuntimeEventKind = "instruction_queued"
+	EventInstructionApplied RuntimeEventKind = "instruction_applied"
 )
 
 // RuntimeEvent is the internal TUI event type, bridging agentcore/litellm events.
@@ -53,13 +58,13 @@ type UsageSnapshot struct {
 type ChapterStatus string
 
 const (
-	ChapterPending     ChapterStatus = "pending"
-	ChapterWriting     ChapterStatus = "writing"
-	ChapterReviewing   ChapterStatus = "reviewing"
-	ChapterVerifying   ChapterStatus = "verifying"
-	ChapterRewriting   ChapterStatus = "rewriting"
-	ChapterDone        ChapterStatus = "done"
-	ChapterNeedsReview ChapterStatus = "needs_human_review"
+	ChapterPending       ChapterStatus = "pending"
+	ChapterWriting       ChapterStatus = "writing"
+	ChapterReviewing     ChapterStatus = "reviewing"
+	ChapterVerifying     ChapterStatus = "verifying"
+	ChapterRewriting     ChapterStatus = "rewriting"
+	ChapterDone          ChapterStatus = "done"
+	ChapterNeedsReview   ChapterStatus = "needs_human_review"
 	ChapterNeedsRevision ChapterStatus = "needs_revision"
 )
 
@@ -129,6 +134,16 @@ func BridgeRunEvent(ev contracts.RunEvent) RuntimeEvent {
 		re.Kind = EventQualityReview
 	case string(EventExportArtifact):
 		re.Kind = EventExportArtifact
+	case string(EventPauseRequested):
+		re.Kind = EventPauseRequested
+	case string(EventPaused):
+		re.Kind = EventPaused
+	case string(EventResumed):
+		re.Kind = EventResumed
+	case string(EventInstructionQueued):
+		re.Kind = EventInstructionQueued
+	case string(EventInstructionApplied):
+		re.Kind = EventInstructionApplied
 	default:
 		re.Kind = EventRoleLog
 	}
@@ -207,3 +222,15 @@ type RuntimeDoneMsg struct {
 
 // RuntimeStopRequestedMsg signals that the user requested a stop.
 type RuntimeStopRequestedMsg struct{}
+
+// RuntimePauseRequestedMsg signals that the user requested a safe-point pause.
+type RuntimePauseRequestedMsg struct{}
+
+// RuntimeResumeRequestedMsg signals that the user requested generation resume.
+type RuntimeResumeRequestedMsg struct{}
+
+// RuntimeInstructionSubmittedMsg carries a user instruction to apply at the
+// next safe runtime boundary.
+type RuntimeInstructionSubmittedMsg struct {
+	Text string
+}

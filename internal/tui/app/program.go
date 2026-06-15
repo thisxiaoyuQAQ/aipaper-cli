@@ -40,7 +40,7 @@ func RunProgram(ctx context.Context, opts ProgramOptions) error {
 }
 
 func (BubbleTeaRunner) Run(ctx context.Context, model RootModel, opts ProgramOptions) error {
-	programOpts := []tea.ProgramOption{tea.WithContext(ctx)}
+	programOpts := []tea.ProgramOption{tea.WithContext(ctx), tea.WithMouseCellMotion()}
 	if opts.Input != nil {
 		programOpts = append(programOpts, tea.WithInput(opts.Input))
 	}

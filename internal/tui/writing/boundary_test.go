@@ -59,12 +59,12 @@ func TestBoundary_UsageAllFieldsMissing(t *testing.T) {
 		At:   time.Now(),
 		Kind: EventUsageUpdate,
 		Usage: &UsageSnapshot{
-			InputTokens:     nil,
-			OutputTokens:    nil,
-			ContextTokens:   nil,
+			InputTokens:      nil,
+			OutputTokens:     nil,
+			ContextTokens:    nil,
 			MaxContextTokens: nil,
-			CostUSD:         nil,
-			Model:           "",
+			CostUSD:          nil,
+			Model:            "",
 		},
 	}
 
@@ -172,11 +172,11 @@ func TestBoundary_ChapterStatusInvalidTypes(t *testing.T) {
 		Kind:      EventChapterStatus,
 		ChapterID: "ch01",
 		Fields: map[string]any{
-			"status":         123,      // 应该是 string
-			"draft_version":  "invalid", // 应该是 int
-			"score":          "invalid", // 应该是 int
+			"status":         123,         // 应该是 string
+			"draft_version":  "invalid",   // 应该是 int
+			"score":          "invalid",   // 应该是 int
 			"citation_score": []int{1, 2}, // 应该是 int
-			"word_count":     nil,      // 应该是 int
+			"word_count":     nil,         // 应该是 int
 		},
 	}
 

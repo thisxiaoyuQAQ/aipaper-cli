@@ -5,18 +5,20 @@ import (
 	"strings"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 )
 
 func (m Model) View() string {
 	var b strings.Builder
 	visible := m.visible()
-	fmt.Fprintf(&b, "Reference candidates (%d visible, %d selected, %d rejected)\n", len(visible), len(m.selected), len(m.rejected))
+	fmt.Fprintf(&b, m.i18n.Text(i18n.ReferencesHeader)+"\n", len(visible), len(m.selected), len(m.rejected))
 	if m.searching {
-		fmt.Fprintf(&b, "Search: %s\n", m.filter)
+		fmt.Fprintf(&b, "%s: %s\n", m.i18n.Text(i18n.ReferencesSearch), m.filter)
 	}
 	b.WriteString("\n")
 	if len(visible) == 0 {
-		b.WriteString("No matching candidates.\n")
+		b.WriteString(m.i18n.Text(i18n.ReferencesNoMatches))
+		b.WriteString("\n")
 		return b.String()
 	}
 	for i, candidate := range visible {
@@ -34,15 +36,15 @@ func (m Model) View() string {
 		fmt.Fprintf(&b, "%s [%s] %s %s\n", cursor, state, candidate.ID, candidate.Title)
 		fmt.Fprintf(&b, "    %s\n", candidateSubtitle(candidate))
 		if candidate.DOI != "" {
-			fmt.Fprintf(&b, "    DOI: %s\n", candidate.DOI)
+			fmt.Fprintf(&b, "    %s: %s\n", m.i18n.Text(i18n.ReferencesDOI), candidate.DOI)
 		} else if candidate.URL != "" {
-			fmt.Fprintf(&b, "    URL: %s\n", candidate.URL)
+			fmt.Fprintf(&b, "    %s: %s\n", m.i18n.Text(i18n.ReferencesURL), candidate.URL)
 		}
 		if candidate.RelevanceScore != 0 {
-			fmt.Fprintf(&b, "    Relevance: %.2f\n", candidate.RelevanceScore)
+			fmt.Fprintf(&b, "    %s: %.2f\n", m.i18n.Text(i18n.ReferencesRelevance), candidate.RelevanceScore)
 		}
 		if candidate.RelevanceReason != "" {
-			fmt.Fprintf(&b, "    Reason: %s\n", candidate.RelevanceReason)
+			fmt.Fprintf(&b, "    %s: %s\n", m.i18n.Text(i18n.ReferencesReason), candidate.RelevanceReason)
 		}
 		b.WriteString("\n")
 	}

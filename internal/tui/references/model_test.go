@@ -76,7 +76,7 @@ func TestModelSelectHighRelevanceAndNoSelectionError(t *testing.T) {
 
 func TestModelViewShowsCandidateDetails(t *testing.T) {
 	view := NewModel(sampleCandidates()).View()
-	for _, want := range []string{"Reference candidates", "RAG for Review Writing", "DOI: 10.1000/rag", "Relevance: 0.90", "direct match"} {
+	for _, want := range []string{"文献候选", "RAG for Review Writing", "DOI: 10.1000/rag", "相关度: 0.90", "direct match"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
 		}

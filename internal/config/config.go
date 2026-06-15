@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -21,6 +22,7 @@ type Config struct {
 	Provider        string                    `json:"provider,omitempty"`
 	Model           string                    `json:"model,omitempty"`
 	DefaultLanguage string                    `json:"default_language,omitempty"`
+	UILanguage      string                    `json:"ui_language,omitempty"`
 	CitationStyle   string                    `json:"citation_style,omitempty"`
 	Style           string                    `json:"style,omitempty"`
 	Providers       map[string]ProviderConfig `json:"providers,omitempty"`
@@ -92,6 +94,7 @@ func Load(opts LoadOptions) (Config, []string, error) {
 		merged = Merge(merged, cfg)
 		loaded = append(loaded, path)
 	}
+	merged.UILanguage = string(i18n.NormalizeLanguage(merged.UILanguage))
 	return merged, loaded, nil
 }
 
@@ -105,6 +108,9 @@ func Merge(base, override Config) Config {
 	}
 	if override.DefaultLanguage != "" {
 		out.DefaultLanguage = override.DefaultLanguage
+	}
+	if override.UILanguage != "" {
+		out.UILanguage = override.UILanguage
 	}
 	if override.CitationStyle != "" {
 		out.CitationStyle = override.CitationStyle
@@ -169,6 +175,9 @@ func MergeRole(base, override RoleConfig) RoleConfig {
 }
 
 func (c Config) Validate() error {
+	if !i18n.IsSupported(c.UILanguage) {
+		return errors.New("ui_language must be zh-CN or en")
+	}
 	if c.Provider == "" && c.Model == "" {
 		return nil
 	}

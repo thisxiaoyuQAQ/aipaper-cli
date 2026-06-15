@@ -1,11 +1,13 @@
 package configwizard
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/agent"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 )
 
 type Step int
@@ -25,6 +27,7 @@ const (
 	FieldModel
 	FieldAPIKey
 	FieldDefaultLanguage
+	FieldUILanguage
 	FieldCitationStyle
 )
 
@@ -40,6 +43,7 @@ type ProviderTemplate struct {
 type Options struct {
 	WorkDir string
 	Save    func(string, config.Config) (string, error)
+	I18N    i18n.T
 }
 
 type Model struct {
@@ -55,6 +59,7 @@ type Model struct {
 	err          error
 	savedPath    string
 	directSecret bool
+	i18n         i18n.T
 }
 
 var orderedFields = []Field{
@@ -64,6 +69,7 @@ var orderedFields = []Field{
 	FieldModel,
 	FieldAPIKey,
 	FieldDefaultLanguage,
+	FieldUILanguage,
 	FieldCitationStyle,
 }
 
@@ -72,11 +78,16 @@ func NewModel(opts Options) Model {
 	if save == nil {
 		save = config.SaveProject
 	}
+	tr := opts.I18N
+	if tr.IsZero() {
+		tr = i18n.New("")
+	}
 	m := Model{
 		workDir: opts.WorkDir,
 		save:    save,
 		step:    StepTemplate,
 		values:  map[Field]string{},
+		i18n:    tr,
 	}
 	m.applyTemplate(DefaultTemplates()[0])
 	m.step = StepTemplate
@@ -110,7 +121,7 @@ func (m Model) UpdateKey(key string) Model {
 	case StepSummary:
 		return m.updateSummary(key)
 	default:
-		m.err = fmt.Errorf("unknown wizard step")
+		m.err = errors.New(m.i18n.Text(i18n.ConfigErrUnknownStep))
 		return m
 	}
 }
@@ -124,7 +135,7 @@ func (m Model) SelectTemplate(name string) Model {
 			return m
 		}
 	}
-	m.err = fmt.Errorf("unknown provider template")
+	m.err = errors.New(m.i18n.Text(i18n.ConfigErrUnknownTemplate))
 	return m
 }
 
@@ -159,6 +170,7 @@ func (m Model) Config() (config.Config, error) {
 		Provider:        providerName,
 		Model:           modelName,
 		DefaultLanguage: strings.TrimSpace(m.values[FieldDefaultLanguage]),
+		UILanguage:      string(i18n.NormalizeLanguage(m.values[FieldUILanguage])),
 		CitationStyle:   strings.TrimSpace(m.values[FieldCitationStyle]),
 		Providers: map[string]config.ProviderConfig{
 			providerName: provider,
@@ -170,21 +182,30 @@ func (m Model) Config() (config.Config, error) {
 func (m Model) Summary() string {
 	cfg, err := m.Config()
 	if err != nil {
-		return "Configuration is incomplete."
+		return m.i18n.Text(i18n.ConfigIncomplete)
 	}
 	provider := cfg.Providers[cfg.Provider]
 	apiKey := config.MaskSecret(provider.APIKey)
 	if apiKey == "" {
-		apiKey = "(empty)"
+		apiKey = m.i18n.Text(i18n.CommonNone)
 	}
 	return fmt.Sprintf(
-		"Provider: %s\nType: %s\nBase URL: %s\nModel: %s\nAPI key: %s\nLanguage: %s\nCitation: %s",
+		"%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %s",
+		m.i18n.Text(i18n.ConfigSummaryProvider),
 		cfg.Provider,
+		m.i18n.Text(i18n.ConfigSummaryType),
 		provider.Type,
+		m.i18n.Text(i18n.ConfigSummaryBaseURL),
 		provider.BaseURL,
+		m.i18n.Text(i18n.ConfigSummaryModel),
 		cfg.Model,
+		m.i18n.Text(i18n.ConfigSummaryAPIKey),
 		apiKey,
+		m.i18n.Text(i18n.ConfigSummaryDefaultLanguage),
 		cfg.DefaultLanguage,
+		m.i18n.Text(i18n.ConfigSummaryUILanguage),
+		cfg.UILanguage,
+		m.i18n.Text(i18n.ConfigSummaryCitation),
 		cfg.CitationStyle,
 	)
 }
@@ -291,7 +312,7 @@ func (m Model) updateSummary(key string) Model {
 		}
 		path, err := m.save(m.workDir, cfg)
 		if err != nil {
-			m.err = fmt.Errorf("save config failed: %w", err)
+			m.err = fmt.Errorf(m.i18n.Text(i18n.ConfigErrSaveFailed), err)
 			return m
 		}
 		m.savedPath = path
@@ -314,6 +335,7 @@ func (m *Model) applyTemplate(template ProviderTemplate) {
 		FieldModel:           template.Model,
 		FieldAPIKey:          apiKey,
 		FieldDefaultLanguage: "zh-CN",
+		FieldUILanguage:      "zh-CN",
 		FieldCitationStyle:   "gbt7714",
 	}
 	m.directSecret = false
@@ -321,30 +343,35 @@ func (m *Model) applyTemplate(template ProviderTemplate) {
 
 func (m Model) validateFields() error {
 	if strings.TrimSpace(m.values[FieldProviderName]) == "" {
-		return fmt.Errorf("provider name is required")
+		return errors.New(m.i18n.Text(i18n.ConfigErrProviderName))
 	}
 	if strings.TrimSpace(m.values[FieldProviderType]) == "" {
-		return fmt.Errorf("provider type is required")
+		return errors.New(m.i18n.Text(i18n.ConfigErrProviderType))
 	}
 	if strings.EqualFold(m.template.Name, "Custom") && strings.TrimSpace(m.values[FieldBaseURL]) == "" {
-		return fmt.Errorf("base url is required for custom providers")
+		return errors.New(m.i18n.Text(i18n.ConfigErrBaseURL))
 	}
 	if strings.TrimSpace(m.values[FieldModel]) == "" {
-		return fmt.Errorf("model is required")
+		return errors.New(m.i18n.Text(i18n.ConfigErrModel))
 	}
 	apiKey := strings.TrimSpace(m.values[FieldAPIKey])
 	if m.template.APIKeyRequired && apiKey == "" {
-		return fmt.Errorf("api key is required; use an env: reference when possible")
+		return errors.New(m.i18n.Text(i18n.ConfigErrAPIKey))
 	}
 	if lang := strings.TrimSpace(m.values[FieldDefaultLanguage]); lang == "" {
-		return fmt.Errorf("default language is required")
+		return errors.New(m.i18n.Text(i18n.ConfigErrDefaultLanguage))
 	} else if lang != "zh-CN" && lang != "en" {
-		return fmt.Errorf("default language must be zh-CN or en")
+		return errors.New(m.i18n.Text(i18n.ConfigErrDefaultLanguageMust))
+	}
+	if lang := strings.TrimSpace(m.values[FieldUILanguage]); lang == "" {
+		return errors.New(m.i18n.Text(i18n.ConfigErrUILanguage))
+	} else if !i18n.IsSupported(lang) {
+		return errors.New(m.i18n.Text(i18n.ConfigErrUILanguageMust))
 	}
 	if style := strings.TrimSpace(m.values[FieldCitationStyle]); style == "" {
-		return fmt.Errorf("citation style is required")
+		return errors.New(m.i18n.Text(i18n.ConfigErrCitation))
 	} else if style != "gbt7714" && style != "apa" {
-		return fmt.Errorf("citation style must be gbt7714 or apa")
+		return errors.New(m.i18n.Text(i18n.ConfigErrCitationMust))
 	}
 	return nil
 }

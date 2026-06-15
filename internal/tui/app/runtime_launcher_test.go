@@ -4,7 +4,9 @@ package app
 // forwarding, start-failure handling, and the launcher event sink.
 
 import (
+	"bytes"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,6 +78,44 @@ func TestRootModelStopRequestAbortsRuntime(t *testing.T) {
 	_ = root
 }
 
+func TestRootModelBuffersRuntimeCommandsBeforeStart(t *testing.T) {
+	model := NewRootModel(RootOptions{WorkDir: t.TempDir(), InitialScreen: ScreenWriting})
+	updated, _ := model.Update(writingtui.RuntimePauseRequestedMsg{})
+	root := updated.(RootModel)
+	if !root.pendingRuntimePause {
+		t.Fatalf("pause request was not buffered")
+	}
+	updated, _ = root.Update(writingtui.RuntimeInstructionSubmittedMsg{Text: "补充实验限制"})
+	root = updated.(RootModel)
+	if len(root.pendingRuntimeInstructions) != 1 {
+		t.Fatalf("instruction was not buffered: %#v", root.pendingRuntimeInstructions)
+	}
+
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8), resumeCh: make(chan struct{})}
+	updated, _ = root.Update(writingRuntimeStartedMsg{runtime: rt})
+	root = updated.(RootModel)
+	if !rt.pauseRequested || len(rt.pendingInstructions) != 1 {
+		t.Fatalf("buffered commands not applied: pause=%v instructions=%#v", rt.pauseRequested, rt.pendingInstructions)
+	}
+	if root.pendingRuntimePause || len(root.pendingRuntimeInstructions) != 0 {
+		t.Fatalf("root buffers not cleared")
+	}
+}
+
+func TestRootModelConfirmWritingExitWaitsForCheckpoint(t *testing.T) {
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8), resumeCh: make(chan struct{})}
+	model := NewRootModel(RootOptions{WorkDir: t.TempDir(), InitialScreen: ScreenWriting})
+	model.runtime = rt
+	model.exitConfirm = true
+	model.exitConfirmScreen = ScreenWriting
+
+	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	root := updated.(RootModel)
+	if cmd == nil || !rt.stopRequested.Load() || root.exitConfirm {
+		t.Fatalf("expected stop request and event wait, stop=%v confirm=%v cmd=%v", rt.stopRequested.Load(), root.exitConfirm, cmd)
+	}
+}
+
 func TestRootModelRuntimeStartFailureStaysOnWritingScreen(t *testing.T) {
 	model := NewRootModel(RootOptions{
 		WorkDir:       t.TempDir(),
@@ -88,7 +128,7 @@ func TestRootModelRuntimeStartFailureStaysOnWritingScreen(t *testing.T) {
 		t.Fatalf("writing model should carry the start error")
 	}
 	// A failed start must not slide into the export screen on the next key.
-	next, _ := root.updateWriting("enter")
+	next, _ := root.updateWriting(tea.KeyMsg{Type: tea.KeyEnter})
 	root = next.(RootModel)
 	if root.CurrentScreen != ScreenWriting {
 		t.Fatalf("CurrentScreen = %q, want %q", root.CurrentScreen, ScreenWriting)
@@ -99,13 +139,17 @@ func TestLauncherSinkFiltersAndAccumulatesUsage(t *testing.T) {
 	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8)}
 	sink := rt.makeSink()
 
-	// Noisy lifecycle kinds are dropped.
+	// Noisy lifecycle kinds are dropped, but meaningful wait context is retained.
 	sink(contracts.RunEvent{Kind: "message_update", Fields: map[string]any{"delta": "x"}})
 	sink(contracts.RunEvent{Kind: "turn_end"})
 	// agent_end is kept for the launcher loop, not forwarded to the TUI.
 	sink(contracts.RunEvent{Kind: "agent_end", Fields: map[string]any{"end_reason": "max_turns"}})
 	if len(rt.msgs) != 0 {
 		t.Fatalf("filtered events leaked into the channel: %d", len(rt.msgs))
+	}
+	activity := rt.activitySnapshot()
+	if activity.kind != "agent_end" || activity.agent != "coordinator" {
+		t.Fatalf("filtered activity was not retained: %#v", activity)
 	}
 
 	// Usage folds into cumulative totals.
@@ -188,6 +232,11 @@ func TestWritingRuntimeHeartbeatEmitsWhileIdle(t *testing.T) {
 		if ev.Kind != writingtui.EventRoleLog {
 			t.Fatalf("kind = %q, want %q", ev.Kind, writingtui.EventRoleLog)
 		}
+		for _, want := range []string{"写作等待中", "等待 coordinator/LLM 当前轮完成", "round=3", "已等待=", "阶段=启动/规划", "章节=未确定", "最近事件=尚未收到运行事件", "model=未配置"} {
+			if !strings.Contains(ev.Message, want) {
+				t.Fatalf("heartbeat message %q does not contain %q", ev.Message, want)
+			}
+		}
 	case <-time.After(time.Second):
 		t.Fatal("heartbeat did not fire while idle")
 	}
@@ -220,4 +269,73 @@ func TestWritingRuntimeStopHeartbeatTearsDown(t *testing.T) {
 
 	// Stopping twice must be a no-op (safe on run-exit + Stop paths).
 	rt.stopHeartbeat()
+}
+
+func TestWritingRuntimeHeartbeatIncludesLatestActivity(t *testing.T) {
+	prev := heartbeatInterval
+	heartbeatInterval = 10 * time.Millisecond
+	t.Cleanup(func() { heartbeatInterval = prev })
+
+	var diag bytes.Buffer
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8), diag: newBufferDiagLogger(&diag), model: "gpt-test"}
+	sink := rt.makeSink()
+	sink(contracts.RunEvent{
+		At:      time.Now().Add(-2 * time.Second),
+		Kind:    string(writingtui.EventChapterStatus),
+		Message: "chapter ch01: writing",
+		Fields: map[string]any{
+			"agent":         "writer",
+			"chapter_id":    "ch01",
+			"status":        "writing",
+			"draft_version": 2,
+		},
+	})
+	<-rt.msgs // drain chapter_status event before reading heartbeat
+
+	idle := make(chan struct{})
+	rt.startHeartbeat(2, idle)
+	defer rt.stopHeartbeat()
+
+	select {
+	case msg := <-rt.msgs:
+		ev, ok := msg.(writingtui.RuntimeEventMsg)
+		if !ok {
+			t.Fatalf("expected RuntimeEventMsg, got %T", msg)
+		}
+		for _, want := range []string{"round=2", "阶段=writing", "章节=ch01", "最近事件=writer 章节 ch01 状态 writing", "距最近事件=", "model=gpt-test"} {
+			if !strings.Contains(ev.Message, want) {
+				t.Fatalf("heartbeat message %q does not contain %q", ev.Message, want)
+			}
+		}
+	case <-time.After(time.Second):
+		t.Fatal("heartbeat did not fire")
+	}
+
+	logLine := diag.String()
+	for _, want := range []string{"heartbeat round=2", "wait_target=agent_idle", "phase=\"writing\"", "chapter=\"ch01\"", "last_event=\"writer 章节 ch01 状态 writing\"", "model=\"gpt-test\""} {
+		if !strings.Contains(logLine, want) {
+			t.Fatalf("diag log %q does not contain %q", logLine, want)
+		}
+	}
+}
+
+func TestWritingRuntimeHeartbeatLabelsFailedToolActivity(t *testing.T) {
+	rt := &WritingRuntime{msgs: make(chan tea.Msg, 8), model: "gpt-test"}
+	sink := rt.makeSink()
+	sink(contracts.RunEvent{
+		At:      time.Now(),
+		Kind:    "tool_exec_end",
+		Message: "",
+		Fields: map[string]any{
+			"agent":    "coordinator",
+			"tool":     "writer_run",
+			"is_error": true,
+		},
+	})
+	<-rt.msgs // drain tool end event before constructing heartbeat text
+
+	message, _, _ := rt.heartbeatPayload(1, 15*time.Second, time.Now())
+	if !strings.Contains(message, "最近事件=coordinator 工具失败 writer_run") {
+		t.Fatalf("heartbeat did not label failed tool activity: %q", message)
+	}
 }

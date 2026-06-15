@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/export"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -30,6 +31,8 @@ type Options struct {
 
 	// Result is the export result produced by ExportSummary.
 	Result export.Result
+
+	I18N i18n.T
 }
 
 // Model represents the completion screen state.
@@ -37,6 +40,7 @@ type Model struct {
 	store  store.Store
 	result export.Result
 	quit   bool
+	i18n   i18n.T
 }
 
 // NewModel creates a new Done model.
@@ -45,9 +49,14 @@ func NewModel(opts Options) Model {
 	if workDir == "" {
 		workDir = "."
 	}
+	tr := opts.I18N
+	if tr.IsZero() {
+		tr = i18n.New("")
+	}
 	return Model{
 		store:  store.New(workDir),
 		result: opts.Result,
+		i18n:   tr,
 	}
 }
 
@@ -90,16 +99,18 @@ func (m Model) Quit() bool {
 func (m Model) View() string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render("✓ 全部完成"))
+	b.WriteString(titleStyle.Render(m.i18n.Text(i18n.DoneTitle)))
 	b.WriteString("\n\n")
 
-	b.WriteString("输出目录: ")
+	b.WriteString(m.i18n.Text(i18n.DoneOutputDir))
+	b.WriteString(": ")
 	b.WriteString(pathStyle.Render(m.store.Path("final")))
 	b.WriteString("\n\n")
 
-	b.WriteString("生成文件:\n")
+	b.WriteString(m.i18n.Text(i18n.DoneOutputs))
+	b.WriteString(":\n")
 	if len(m.result.Outputs) == 0 {
-		b.WriteString(hintStyle.Render("  (无)"))
+		b.WriteString(hintStyle.Render(m.i18n.Text(i18n.CommonNone)))
 		b.WriteString("\n")
 	} else {
 		for _, out := range m.result.Outputs {
@@ -110,15 +121,16 @@ func (m Model) View() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString("下一步:\n")
-	b.WriteString(hintStyle.Render("  - 使用 recover 子命令可在中断后恢复写作进度"))
+	b.WriteString(m.i18n.Text(i18n.DoneNextSteps))
+	b.WriteString(":\n")
+	b.WriteString(hintStyle.Render(m.i18n.Text(i18n.DoneRecoverHint)))
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("  - 使用 status 子命令可查看当前 run 状态"))
+	b.WriteString(hintStyle.Render(m.i18n.Text(i18n.DoneStatusHint)))
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("  - 使用 config 子命令可调整配置"))
+	b.WriteString(hintStyle.Render(m.i18n.Text(i18n.DoneConfigHint)))
 	b.WriteString("\n\n")
 
-	b.WriteString(hintStyle.Render("[enter]/[q]/[ctrl+c] 退出"))
+	b.WriteString(hintStyle.Render(m.i18n.Text(i18n.DoneExitHint)))
 	b.WriteString("\n")
 	return b.String()
 }

@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	domainmaterials "github.com/thisxiaoyuQAQ/aipaper-cli/internal/materials"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
@@ -41,6 +42,7 @@ type Options struct {
 	Store       store.Store
 	Scan        ScanFunc
 	CreatedDir  bool
+	I18N        i18n.T
 }
 
 type Model struct {
@@ -61,6 +63,7 @@ type Model struct {
 	details    bool
 	action     Action
 	err        error
+	i18n       i18n.T
 }
 
 type ScanStats struct {
@@ -102,6 +105,10 @@ func NewModel(opts Options) Model {
 	if s.Root() == "" {
 		s = store.New(workDir)
 	}
+	tr := opts.I18N
+	if tr.IsZero() {
+		tr = i18n.New("")
+	}
 	return Model{
 		workDir:     workDir,
 		materialDir: materialDir,
@@ -111,6 +118,7 @@ func NewModel(opts Options) Model {
 		status:      StatusScanning,
 		createdDir:  opts.CreatedDir,
 		precreated:  opts.CreatedDir,
+		i18n:        tr,
 	}
 }
 
@@ -264,7 +272,7 @@ func (m Model) scanCmd() tea.Cmd {
 				if err := os.MkdirAll(materialDir, 0o755); err != nil {
 					return ScanFinishedMsg{
 						MaterialDir: materialDir,
-						Err:         fmt.Errorf("create material directory failed: %w", err),
+						Err:         fmt.Errorf("%s", fmt.Sprintf(m.i18n.Text(i18n.MaterialsErrCreateDir), err)),
 					}
 				}
 				return ScanFinishedMsg{MaterialDir: materialDir, CreatedDir: true}
@@ -274,7 +282,7 @@ func (m Model) scanCmd() tea.Cmd {
 		if !info.IsDir() {
 			return ScanFinishedMsg{
 				MaterialDir: materialDir,
-				Err:         fmt.Errorf("material path is not a directory"),
+				Err:         fmt.Errorf("%s", m.i18n.Text(i18n.MaterialsErrPathNotDir)),
 			}
 		}
 		result, err := scan(materialDir, s)

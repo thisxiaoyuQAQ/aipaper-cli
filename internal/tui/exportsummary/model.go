@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/export"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -31,6 +32,8 @@ type Options struct {
 	// Now is forwarded to export.ExportFinal for deterministic versions in
 	// tests. Zero value uses the current UTC time.
 	Now time.Time
+
+	I18N i18n.T
 }
 
 // Model represents the ExportSummary screen state.
@@ -45,6 +48,7 @@ type Model struct {
 
 	done     bool
 	canceled bool
+	i18n     i18n.T
 }
 
 // exportDoneMsg carries the outcome of an asynchronous export.
@@ -63,10 +67,15 @@ func NewModel(opts Options) Model {
 	if exportFn == nil {
 		exportFn = defaultExport(opts.DocxExporter, opts.Now)
 	}
+	tr := opts.I18N
+	if tr.IsZero() {
+		tr = i18n.New("")
+	}
 	return Model{
 		workDir: workDir,
 		store:   store.New(workDir),
 		export:  exportFn,
+		i18n:    tr,
 	}
 }
 

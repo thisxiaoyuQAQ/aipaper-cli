@@ -1,6 +1,7 @@
 package quality
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -229,10 +230,45 @@ func TestGateSkippedAndSupportedPass(t *testing.T) {
 	}
 }
 
+func TestGateChapterEvidenceSufficiencyAndLowContent(t *testing.T) {
+	input := gateInput(ModeEnhanced, gateClaim("claim_001", SupportSupported, RiskLow, "ev_meta"))
+	input.ArticleTemplate = ArticleTemplateReviewPaper
+	input.SectionQualityPlan = SectionQualityPlan{Sections: []SectionPlan{{
+		ChapterID:           "ch01",
+		RequiredEvidenceIDs: []string{"ev_meta", "ev_snippet"},
+	}}}
+	input.ChapterMarkdown = map[string]string{
+		"ch01": "证据不足。本文只能提出框架，待验证。",
+	}
+
+	outcome := EvaluateQualityGate(input)
+	if outcome.Conclusion != GateNeedsRevision {
+		t.Fatalf("conclusion = %q, findings = %#v", outcome.Conclusion, outcome.Findings)
+	}
+	for _, code := range []string{CodeGateEvidenceInsufficient, CodeGateRequiredEvidenceUnused, CodeGateMetadataOnlyChapter, CodeGateLowContentSignal} {
+		if findIssue(outcome.Findings, code) == nil {
+			t.Fatalf("findings missing %s: %#v", code, outcome.Findings)
+		}
+	}
+}
+
+func TestGateLowContentSignalAllowsSubstantiveChineseText(t *testing.T) {
+	input := gateInput(ModeEnhanced, gateClaim("claim_001", SupportSupported, RiskLow, "ev_snippet"))
+	input.SectionQualityPlan = SectionQualityPlan{Sections: []SectionPlan{{ChapterID: "ch01"}}}
+	input.ChapterMarkdown = map[string]string{
+		"ch01": strings.Repeat("这是一个包含具体研究对象方法结果和比较维度的中文论证段落。", 18),
+	}
+
+	outcome := EvaluateQualityGate(input)
+	if issue := findIssue(outcome.Findings, CodeGateLowContentSignal); issue != nil {
+		t.Fatalf("substantive Chinese text was flagged as low content: %#v", issue)
+	}
+}
+
 func TestGateRewriteOverrunNeedsHumanReviewWithoutInterrupting(t *testing.T) {
 	for _, mode := range []string{ModeFast, ModeEnhanced, ModeStrict} {
 		input := gateInput(mode, gateClaim("claim_001", SupportSupported, "", "ev_snippet"))
-		input.RewriteRounds = map[string]int{"ch01": 3, "ch02": 2}
+		input.RewriteRounds = map[string]int{"ch01": 3, "ch02": 1}
 		outcome := EvaluateQualityGate(input)
 		if outcome.Conclusion != GateNeedsHumanReview {
 			t.Fatalf("%s conclusion = %q, want needs_human_review", mode, outcome.Conclusion)

@@ -154,6 +154,24 @@ func setupQualityMini(t *testing.T) qualityMiniSetup {
 	if _, err := quality.SaveEvidenceTable(s, table); err != nil {
 		t.Fatalf("SaveEvidenceTable() error = %v", err)
 	}
+	sectionPlan := quality.SectionQualityPlan{
+		GeneratedAt: fixedTime(),
+		Sections: []quality.SectionPlan{
+			{
+				ChapterID:           "ch01",
+				Questions:           []string{"How durable are CBT-I effects across delivery modes?"},
+				RequiredEvidenceIDs: []string{"ev_001"},
+			},
+			{
+				ChapterID:           "ch02",
+				Questions:           []string{"How do digital interventions perform for shift workers?"},
+				RequiredEvidenceIDs: []string{"ev_002"},
+			},
+		},
+	}
+	if _, err := quality.SaveSectionQualityPlan(s, sectionPlan); err != nil {
+		t.Fatalf("SaveSectionQualityPlan() error = %v", err)
+	}
 	return setup
 }
 

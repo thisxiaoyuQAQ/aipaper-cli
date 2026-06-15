@@ -28,9 +28,15 @@ const (
 // Architect steps; Warnings records compatibility-mode gaps (old runs without
 // quality artifacts keep running instead of being blocked).
 type WriterChapterInput struct {
-	ChapterID   string               `json:"chapter_id"`
-	QualityPlan *quality.SectionPlan `json:"quality_plan,omitempty"`
-	Evidence    []quality.Evidence   `json:"evidence,omitempty"`
+	ContractVersion        string               `json:"contract_version,omitempty"`
+	ChapterID              string               `json:"chapter_id"`
+	ArticleTemplate        string               `json:"article_template,omitempty"`
+	CitationStyle          string               `json:"citation_style,omitempty"`
+	TemplateGuidance       []string             `json:"template_guidance,omitempty"`
+	ForbiddenDraftPatterns []string             `json:"forbidden_draft_patterns,omitempty"`
+	MinEvidencePerChapter  int                  `json:"min_evidence_per_chapter,omitempty"`
+	QualityPlan            *quality.SectionPlan `json:"quality_plan,omitempty"`
+	Evidence               []quality.Evidence   `json:"evidence,omitempty"`
 	// RewriteInstructions carry the previous review round's structured editor
 	// directives so a rewrite addresses each one (module 28).
 	RewriteInstructions []contracts.RewriteInstruction `json:"rewrite_instructions,omitempty"`
@@ -48,6 +54,7 @@ func BuildWriterChapterInput(s store.Store, raw json.RawMessage) (WriterChapterI
 		return WriterChapterInput{}, AgentError(CodeInvalidJSON, fmt.Sprintf("parse writer_run args: %v", err), false)
 	}
 	input := WriterChapterInput{ChapterID: args.ChapterID}
+	attachWriterPolicy(s, &input)
 	if err := attachRewriteInstructions(s, &input); err != nil {
 		return WriterChapterInput{}, err
 	}
@@ -94,6 +101,31 @@ func BuildWriterChapterInput(s store.Store, raw json.RawMessage) (WriterChapterI
 	return input, nil
 }
 
+func attachWriterPolicy(s store.Store, input *WriterChapterInput) {
+	input.ContractVersion = "paper-standard-v1"
+	var req contracts.Requirements
+	if err := store.ReadJSON(s.RequirementsPath(), &req); err != nil {
+		input.ArticleTemplate = quality.ArticleTemplateZhCoursePaper
+		input.CitationStyle = "gbt7714"
+		input.Warnings = append(input.Warnings, "requirements are unavailable; using default paper template and GB/T 7714 citation policy")
+	} else {
+		template := quality.ResolveArticleTemplate(req.ArticleTemplate)
+		input.ArticleTemplate = template.ID
+		input.CitationStyle = req.CitationStyle
+		if input.CitationStyle == "" {
+			input.CitationStyle = template.DefaultCitationStyle
+		}
+		input.TemplateGuidance = append([]string(nil), template.WriterGuidance...)
+		input.ForbiddenDraftPatterns = append([]string(nil), template.ForbiddenDraftPatterns...)
+		input.MinEvidencePerChapter = template.MinEvidencePerChapter
+		return
+	}
+	template := quality.ResolveArticleTemplate(input.ArticleTemplate)
+	input.TemplateGuidance = append([]string(nil), template.WriterGuidance...)
+	input.ForbiddenDraftPatterns = append([]string(nil), template.ForbiddenDraftPatterns...)
+	input.MinEvidencePerChapter = template.MinEvidencePerChapter
+}
+
 // GuardWriterClaims hard-validates writer claims before chapter artifacts are
 // written: every claim must bind at least one evidence id that exists in the
 // evidence table, and may only cite confirmed reference keys (existing rule).
@@ -110,25 +142,30 @@ func GuardWriterClaims(s store.Store, claims contracts.ClaimsFile) error {
 	if err != nil {
 		return err
 	}
-	evidenceIDs := make(map[string]bool, len(table.Items))
+	evidenceByID := make(map[string]quality.Evidence, len(table.Items))
 	for _, ev := range table.Items {
-		evidenceIDs[ev.ID] = true
+		evidenceByID[ev.ID] = ev
 	}
 	for _, claim := range claims.Claims {
 		if len(claim.EvidenceIDs) == 0 {
 			return writerGuardError(CodeClaimMissingEvidence,
 				fmt.Sprintf("claim %q must bind at least one evidence id", claim.ID), claims.ChapterID, claim.ID)
 		}
-		for _, id := range claim.EvidenceIDs {
-			if !evidenceIDs[id] {
-				return writerGuardError(CodeClaimUnknownEvidence,
-					fmt.Sprintf("claim %q binds evidence %s that is not in the evidence table", claim.ID, id), claims.ChapterID, claim.ID)
-			}
-		}
 		for _, key := range claim.ReferenceKeys {
 			if !confirmedKeys[key] {
 				return writerGuardError(CodeClaimUnconfirmedReference,
 					fmt.Sprintf("claim %q cites reference key %q that is not in references/confirmed.json", claim.ID, key), claims.ChapterID, claim.ID)
+			}
+		}
+		for _, id := range claim.EvidenceIDs {
+			ev, ok := evidenceByID[id]
+			if !ok {
+				return writerGuardError(CodeClaimUnknownEvidence,
+					fmt.Sprintf("claim %q binds evidence %s that is not in the evidence table", claim.ID, id), claims.ChapterID, claim.ID)
+			}
+			if len(claim.ReferenceKeys) > 0 && !containsString(claim.ReferenceKeys, ev.ReferenceKey) {
+				return writerGuardError(CodeClaimUnknownEvidence,
+					fmt.Sprintf("claim %q binds evidence %s from reference %q but cites %v", claim.ID, id, ev.ReferenceKey, claim.ReferenceKeys), claims.ChapterID, claim.ID)
 			}
 		}
 	}
@@ -147,8 +184,11 @@ func WriteGuardedDraftBundle(s store.Store, bundle artifacts.DraftBundle) (artif
 		return artifacts.WriteResult{}, AgentError(CodeToolExecutionFailed, fmt.Sprintf("read confirmed references: %v", err), false)
 	}
 	for _, issue := range artifacts.ValidateDraftArtifacts(bundle.Claims, bundle.CitationMap, confirmed) {
-		if issue.Code == artifacts.CodeUnconfirmedRef {
+		switch issue.Code {
+		case artifacts.CodeUnconfirmedRef:
 			return artifacts.WriteResult{}, writerGuardError(CodeClaimUnconfirmedReference, issue.Message, bundle.ChapterID, issue.ID)
+		case artifacts.CodeMissingClaims, artifacts.CodeMissingCitationMap, artifacts.CodeUnknownClaim, artifacts.CodeHighClaimMissingRef:
+			return artifacts.WriteResult{}, writerGuardError(CodeToolExecutionFailed, issue.Message, bundle.ChapterID, issue.ID)
 		}
 	}
 	return artifacts.WriteDraftBundle(s, bundle)
@@ -191,4 +231,13 @@ func loadEvidenceTableIfPresent(s store.Store) (quality.EvidenceTable, bool, err
 		return quality.EvidenceTable{}, false, AgentError(CodeToolExecutionFailed, fmt.Sprintf("load evidence table: %v", err), false)
 	}
 	return table, true, nil
+}
+
+func containsString(list []string, value string) bool {
+	for _, item := range list {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }

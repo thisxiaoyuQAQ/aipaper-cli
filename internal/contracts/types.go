@@ -13,6 +13,7 @@ type Requirements struct {
 	Scope              string   `json:"scope"`
 	Language           string   `json:"language"`
 	CitationStyle      string   `json:"citation_style"`
+	ArticleTemplate    string   `json:"article_template,omitempty"`
 	QualityMode        string   `json:"quality_mode,omitempty"`
 	TargetWords        int      `json:"target_words"`
 	MaterialDir        string   `json:"material_dir"`
@@ -82,6 +83,7 @@ type ReferenceCandidate struct {
 	CitationCount   int      `json:"citation_count,omitempty"`
 	RelevanceScore  float64  `json:"relevance_score,omitempty"`
 	RelevanceReason string   `json:"relevance_reason,omitempty"`
+	ExpansionSource string   `json:"expansion_source,omitempty"`
 	DedupeGroup     string   `json:"dedupe_group,omitempty"`
 	Status          string   `json:"status"`
 }
@@ -98,6 +100,7 @@ type ConfirmedReference struct {
 	DOI               string    `json:"doi,omitempty"`
 	URL               string    `json:"url,omitempty"`
 	Abstract          string    `json:"abstract,omitempty"`
+	Venue             string    `json:"venue,omitempty"`
 	SourceMaterialIDs []string  `json:"source_material_ids"`
 	ConfirmedAt       time.Time `json:"confirmed_at"`
 }

@@ -63,6 +63,13 @@ func (w *WriterLLMRunner) RunWriter(ctx context.Context, args json.RawMessage) (
 		return nil, fmt.Errorf("writer input chapter_id is required")
 	}
 	s := w.rc.store
+	if input.ContractVersion == "" && input.QualityPlan == nil && len(input.Evidence) == 0 && len(input.Warnings) == 0 {
+		enriched, err := aipagent.BuildWriterChapterInput(s, json.RawMessage(fmt.Sprintf(`{"chapter_id":%q}`, input.ChapterID)))
+		if err != nil {
+			return nil, err
+		}
+		input = enriched
+	}
 
 	req, err := loadRequirementsDoc(s)
 	if err != nil {
@@ -109,7 +116,7 @@ func (w *WriterLLMRunner) RunWriter(ctx context.Context, args json.RawMessage) (
 	}
 
 	warnings := append([]string{}, input.Warnings...)
-	guarded := evidenceTableExists(s)
+	guarded := input.QualityPlan != nil && len(input.Evidence) > 0 && evidenceTableExists(s)
 	var result artifacts.WriteResult
 	if guarded {
 		result, err = aipagent.WriteGuardedDraftBundle(s, bundle)
@@ -168,9 +175,29 @@ func (w *WriterLLMRunner) buildPrompt(req contracts.Requirements, outline outlin
 		fmt.Fprintf(&b, ", language %s", req.Language)
 	}
 	if req.CitationStyle != "" {
-		fmt.Fprintf(&b, ", citation style %s (cite by reference key)", req.CitationStyle)
+		fmt.Fprintf(&b, ", citation style %s (cite by reference key; final numeric citation rendering is handled by the host)", req.CitationStyle)
 	}
 	b.WriteString(".\n\n")
+
+	if input.ContractVersion != "" || input.ArticleTemplate != "" {
+		fmt.Fprintf(&b, "Writer contract: version=%s, article_template=%s, citation_style=%s.\n", input.ContractVersion, input.ArticleTemplate, input.CitationStyle)
+		if len(input.TemplateGuidance) > 0 {
+			b.WriteString("Template guidance:\n")
+			for _, rule := range input.TemplateGuidance {
+				fmt.Fprintf(&b, "- %s\n", rule)
+			}
+		}
+		if len(input.ForbiddenDraftPatterns) > 0 {
+			b.WriteString("Forbidden draft patterns: do NOT make these phrases or ideas the body of the chapter; put real gaps in writer_notes instead:\n")
+			for _, pattern := range input.ForbiddenDraftPatterns {
+				fmt.Fprintf(&b, "- %s\n", pattern)
+			}
+		}
+		if input.MinEvidencePerChapter > 0 {
+			fmt.Fprintf(&b, "Minimum evidence expectation for this chapter: %d evidence item(s), unless writer_notes explicitly explains a blocking gap.\n", input.MinEvidencePerChapter)
+		}
+		b.WriteString("\n")
+	}
 
 	b.WriteString("Confirmed references (cite ONLY these keys, never invent keys):\n")
 	b.WriteString(strings.Join(confirmedRefLines(confirmed), "\n"))
@@ -224,8 +251,19 @@ func buildDraftBundle(chapterID string, version int, out writerModelOut) (artifa
 		WriterNotes:   out.WriterNotes,
 	}
 	var claimIDs []string
+	claimIDSet := map[string]bool{}
 	keySet := map[string]bool{}
 	for _, c := range out.Claims {
+		if strings.TrimSpace(c.ID) == "" {
+			return artifacts.DraftBundle{}, fmt.Errorf("writer claim id is required")
+		}
+		if !strings.HasPrefix(c.ID, chapterID+"_claim_") {
+			return artifacts.DraftBundle{}, fmt.Errorf("writer claim id %q must start with %s_claim_", c.ID, chapterID)
+		}
+		if claimIDSet[c.ID] {
+			return artifacts.DraftBundle{}, fmt.Errorf("writer claim id %q is duplicated", c.ID)
+		}
+		claimIDSet[c.ID] = true
 		bundle.Claims.Claims = append(bundle.Claims.Claims, contracts.Claim{
 			ID: c.ID, Text: c.Text, Importance: c.Importance,
 			ReferenceKeys: c.ReferenceKeys, EvidenceIDs: c.EvidenceIDs, Confidence: c.Confidence,
@@ -236,6 +274,14 @@ func buildDraftBundle(chapterID string, version int, out writerModelOut) (artifa
 		}
 	}
 	for _, m := range out.CitationMappings {
+		if strings.TrimSpace(m.ParagraphID) == "" {
+			return artifacts.DraftBundle{}, fmt.Errorf("writer citation mapping paragraph_id is required")
+		}
+		for _, claimID := range m.ClaimIDs {
+			if !claimIDSet[claimID] {
+				return artifacts.DraftBundle{}, fmt.Errorf("writer citation mapping %s references unknown claim %q", m.ParagraphID, claimID)
+			}
+		}
 		bundle.CitationMap.Mappings = append(bundle.CitationMap.Mappings, contracts.CitationMapping{
 			ParagraphID: m.ParagraphID, ClaimIDs: m.ClaimIDs, ReferenceKeys: m.ReferenceKeys,
 		})
@@ -250,6 +296,19 @@ func buildDraftBundle(chapterID string, version int, out writerModelOut) (artifa
 		bundle.CitationMap.Mappings = []contracts.CitationMapping{{
 			ParagraphID: chapterID + "_p001", ClaimIDs: claimIDs, ReferenceKeys: keys,
 		}}
+	}
+	if len(bundle.CitationMap.Mappings) > 0 {
+		claimMapCounts := map[string]int{}
+		for _, mapping := range bundle.CitationMap.Mappings {
+			for _, claimID := range mapping.ClaimIDs {
+				claimMapCounts[claimID]++
+			}
+		}
+		for _, claimID := range claimIDs {
+			if claimMapCounts[claimID] != 1 {
+				return artifacts.DraftBundle{}, fmt.Errorf("writer claim %q must appear in exactly one citation mapping", claimID)
+			}
+		}
 	}
 	return bundle, nil
 }

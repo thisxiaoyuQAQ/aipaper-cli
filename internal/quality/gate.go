@@ -11,11 +11,18 @@ package quality
 // machine-checked evidence depth. The Host never judges claim semantics.
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/artifacts"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 )
 
@@ -62,6 +69,10 @@ const (
 	CodeGateDuplicateClaim             = "gate_duplicate_claim"
 	CodeGateRewriteRoundsExceeded      = "gate_rewrite_rounds_exceeded"
 	CodeGateUnverifiedClaim            = "gate_unverified_claim"
+	CodeGateEvidenceInsufficient       = "gate_evidence_insufficient"
+	CodeGateRequiredEvidenceUnused     = "gate_required_evidence_unused"
+	CodeGateMetadataOnlyChapter        = "gate_metadata_only_chapter"
+	CodeGateLowContentSignal           = "gate_low_content_signal"
 )
 
 // GateIssue is one finding (hard block or graded risk) with its resolved
@@ -89,11 +100,14 @@ type GateOutcome struct {
 // machine facts loaded from the store; RewriteRounds maps chapter id to the
 // rewrite rounds already spent.
 type GateInput struct {
-	Mode          string
-	Graph         ClaimGraph
-	ConfirmedKeys map[string]bool
-	EvidenceByID  map[string]Evidence
-	RewriteRounds map[string]int
+	Mode               string
+	Graph              ClaimGraph
+	ConfirmedKeys      map[string]bool
+	EvidenceByID       map[string]Evidence
+	RewriteRounds      map[string]int
+	SectionQualityPlan SectionQualityPlan
+	ChapterMarkdown    map[string]string
+	ArticleTemplate    string
 }
 
 var conclusionRank = map[string]int{
@@ -146,15 +160,113 @@ func RunQualityGate(s store.Store, mode string, rewriteRounds map[string]int, no
 			evidenceByID[item.ID] = item
 		}
 	}
+	sectionPlan, err := loadOptionalSectionQualityPlan(s)
+	if err != nil {
+		return GateOutcome{}, err
+	}
+	chapterMarkdown, err := loadChapterMarkdown(s, graph)
+	if err != nil {
+		return GateOutcome{}, err
+	}
+	articleTemplate := loadArticleTemplate(s)
 	outcome := EvaluateQualityGate(GateInput{
-		Mode:          normalized,
-		Graph:         graph,
-		ConfirmedKeys: confirmed,
-		EvidenceByID:  evidenceByID,
-		RewriteRounds: rewriteRounds,
+		Mode:               normalized,
+		Graph:              graph,
+		ConfirmedKeys:      confirmed,
+		EvidenceByID:       evidenceByID,
+		RewriteRounds:      rewriteRounds,
+		SectionQualityPlan: sectionPlan,
+		ChapterMarkdown:    chapterMarkdown,
+		ArticleTemplate:    articleTemplate,
 	})
 	outcome.CheckedAt = now.UTC()
 	return outcome, nil
+}
+
+func loadOptionalSectionQualityPlan(s store.Store) (SectionQualityPlan, error) {
+	plan, err := LoadSectionQualityPlan(s)
+	if err == nil {
+		return plan, nil
+	}
+	if qualityArtifactMissing(s, SectionPlanJSONRel) {
+		return SectionQualityPlan{}, nil
+	}
+	return SectionQualityPlan{}, err
+}
+
+func loadArticleTemplate(s store.Store) string {
+	var req contracts.Requirements
+	if err := store.ReadJSON(s.RequirementsPath(), &req); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(req.ArticleTemplate)
+}
+
+func loadChapterMarkdown(s store.Store, graph ClaimGraph) (map[string]string, error) {
+	versions := map[string]int{}
+	for _, node := range graph.Claims {
+		if node.ChapterID == "" {
+			continue
+		}
+		if _, ok := versions[node.ChapterID]; ok {
+			continue
+		}
+		version, err := latestDraftVersion(s, node.ChapterID)
+		if err != nil {
+			return nil, err
+		}
+		if version > 0 {
+			versions[node.ChapterID] = version
+		}
+	}
+	out := make(map[string]string, len(versions))
+	for chapterID, version := range versions {
+		draftRel, err := artifacts.DraftPath(chapterID, version)
+		if err != nil {
+			return nil, err
+		}
+		data, err := os.ReadFile(s.Path(filepath.FromSlash(draftRel)))
+		if err != nil {
+			return nil, err
+		}
+		out[chapterID] = string(data)
+	}
+	return out, nil
+}
+
+func latestDraftVersion(s store.Store, chapterID string) (int, error) {
+	dir := s.Path("drafts", chapterID)
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	latest := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasPrefix(name, "draft-v") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		versionText := strings.TrimSuffix(strings.TrimPrefix(name, "draft-v"), ".md")
+		version, err := strconv.Atoi(versionText)
+		if err != nil {
+			continue
+		}
+		if version > latest {
+			latest = version
+		}
+	}
+	return latest, nil
+}
+
+func qualityArtifactMissing(s store.Store, relPath string) bool {
+	_, err := os.Stat(s.Path(filepath.FromSlash(relPath)))
+	return os.IsNotExist(err)
 }
 
 // EvaluateQualityGate is the deterministic gate matrix. It never reads the
@@ -170,6 +282,7 @@ func EvaluateQualityGate(input GateInput) GateOutcome {
 		outcome.Findings = append(outcome.Findings, gradedRisks(node, input, mode)...)
 	}
 	outcome.Findings = append(outcome.Findings, rewriteOverruns(input.RewriteRounds, mode)...)
+	outcome.Findings = append(outcome.Findings, chapterQualityRisks(input, mode)...)
 	sortIssues(outcome.Blockers)
 	sortIssues(outcome.Findings)
 	if len(outcome.Blockers) > 0 {
@@ -271,6 +384,151 @@ func gradedRisks(node ClaimNode, input GateInput, mode string) []GateIssue {
 	return issues
 }
 
+func chapterQualityRisks(input GateInput, mode string) []GateIssue {
+	template := ResolveArticleTemplate(input.ArticleTemplate)
+	claimsByChapter := map[string][]ClaimNode{}
+	for _, node := range input.Graph.Claims {
+		claimsByChapter[node.ChapterID] = append(claimsByChapter[node.ChapterID], node)
+	}
+	scope := chapterQualityScope(input)
+	var issues []GateIssue
+	for _, section := range input.SectionQualityPlan.Sections {
+		if scope != nil && !scope[section.ChapterID] {
+			continue
+		}
+		claims := claimsByChapter[section.ChapterID]
+		usedEvidence := map[string]bool{}
+		chapterEvidence := map[string]Evidence{}
+		metadataOnly := true
+		for _, node := range claims {
+			for _, id := range node.EvidenceIDs {
+				usedEvidence[id] = true
+				if ev, ok := input.EvidenceByID[id]; ok {
+					chapterEvidence[id] = ev
+					if ev.Depth != DepthMetadataOnly {
+						metadataOnly = false
+					}
+				}
+			}
+		}
+		for _, id := range section.RequiredEvidenceIDs {
+			if !usedEvidence[id] {
+				issues = append(issues, GateIssue{
+					Code:      CodeGateRequiredEvidenceUnused,
+					ChapterID: section.ChapterID,
+					Message:   fmt.Sprintf("required evidence %s from section quality plan is not used by any claim", id),
+					Severity:  strictOnlyRevision(mode),
+				})
+			}
+		}
+		minEvidence := template.MinEvidencePerChapter
+		if minEvidence > 0 && len(chapterEvidence) < minEvidence {
+			issues = append(issues, GateIssue{
+				Code:      CodeGateEvidenceInsufficient,
+				ChapterID: section.ChapterID,
+				Message:   fmt.Sprintf("chapter %s uses %d evidence item(s), below template minimum %d", section.ChapterID, len(chapterEvidence), minEvidence),
+				Severity:  supportSeverity(mode),
+			})
+		}
+		if len(chapterEvidence) > 0 && metadataOnly {
+			issues = append(issues, GateIssue{
+				Code:      CodeGateMetadataOnlyChapter,
+				ChapterID: section.ChapterID,
+				Message:   fmt.Sprintf("chapter %s relies only on metadata-level evidence", section.ChapterID),
+				Severity:  strictOnlyRevision(mode),
+			})
+		}
+		if signal := lowContentSignal(input.ChapterMarkdown[section.ChapterID], template); signal != "" {
+			issues = append(issues, GateIssue{
+				Code:      CodeGateLowContentSignal,
+				ChapterID: section.ChapterID,
+				Message:   signal,
+				Severity:  supportSeverity(mode),
+			})
+		}
+	}
+	return issues
+}
+
+func chapterQualityScope(input GateInput) map[string]bool {
+	if len(input.RewriteRounds) > 0 {
+		chapters := map[string]bool{}
+		for chapterID := range input.RewriteRounds {
+			if chapterID != "" {
+				chapters[chapterID] = true
+			}
+		}
+		if len(chapters) > 0 {
+			return chapters
+		}
+	}
+
+	chapters := map[string]bool{}
+	for _, node := range input.Graph.Claims {
+		if node.ChapterID != "" {
+			chapters[node.ChapterID] = true
+		}
+	}
+	for chapterID := range input.ChapterMarkdown {
+		if strings.TrimSpace(input.ChapterMarkdown[chapterID]) != "" {
+			chapters[chapterID] = true
+		}
+	}
+	if len(chapters) == 0 {
+		return nil
+	}
+	return chapters
+}
+
+func lowContentSignal(markdown string, template ArticleTemplate) string {
+	text := strings.TrimSpace(markdown)
+	if text == "" {
+		return "chapter body is empty"
+	}
+	if template.LowContentMinWords > 0 {
+		if cjkCount := contentLengthScore(text); cjkCount < template.LowContentMinWords {
+			return fmt.Sprintf("chapter body has only %d content unit(s), below template minimum %d", cjkCount, template.LowContentMinWords)
+		}
+	}
+	lower := strings.ToLower(text)
+	matches := 0
+	for _, pattern := range template.ForbiddenDraftPatterns {
+		if strings.Contains(lower, strings.ToLower(pattern)) {
+			matches++
+		}
+	}
+	if matches >= 2 {
+		return fmt.Sprintf("chapter body contains %d forbidden low-content/caveat pattern(s)", matches)
+	}
+	return ""
+}
+
+func contentLengthScore(text string) int {
+	words := len(strings.Fields(text))
+	nonSpaceRunes := 0
+	cjkRunes := 0
+	for _, r := range text {
+		if unicode.IsSpace(r) {
+			continue
+		}
+		nonSpaceRunes++
+		if isCJKRune(r) {
+			cjkRunes++
+		}
+	}
+	if cjkRunes > nonSpaceRunes/2 {
+		cjkUnits := nonSpaceRunes / 2
+		if cjkUnits > words {
+			return cjkUnits
+		}
+	}
+	return words
+}
+
+func isCJKRune(r rune) bool {
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul)
+}
+
 // rewriteOverruns marks chapters whose rewrite loop exceeded the existing
 // artifacts.MaxRevisionRounds limit. Every mode escalates to
 // needs_human_review without interrupting the run; strict pins the issue to
@@ -283,7 +541,7 @@ func rewriteOverruns(rounds map[string]int, mode string) []GateIssue {
 	sort.Strings(chapters)
 	var issues []GateIssue
 	for _, chapterID := range chapters {
-		if rounds[chapterID] <= artifacts.MaxRevisionRounds {
+		if rounds[chapterID] < artifacts.MaxRevisionRounds {
 			continue
 		}
 		issues = append(issues, GateIssue{

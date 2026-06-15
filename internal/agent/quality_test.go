@@ -16,6 +16,17 @@ import (
 func setupQualityStore(t *testing.T) store.Store {
 	t.Helper()
 	s := store.NewAt(t.TempDir())
+	if _, err := store.WriteJSON(s.RequirementsPath(), contracts.Requirements{
+		Topic:           "A Survey",
+		Language:        "en",
+		CitationStyle:   "gbt7714",
+		ArticleTemplate: quality.ArticleTemplateZhCoursePaper,
+		QualityMode:     quality.ModeEnhanced,
+		TargetWords:     500,
+		MaterialDir:     t.TempDir(),
+	}, store.Overwrite); err != nil {
+		t.Fatalf("write requirements.json: %v", err)
+	}
 	confirmed := contracts.ConfirmedReferences{Items: []contracts.ConfirmedReference{{
 		Key:               "doe2024deep",
 		Title:             "Deep Survey",

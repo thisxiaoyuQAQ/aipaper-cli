@@ -82,6 +82,7 @@ func ConfirmCandidates(s store.Store, candidates contracts.ReferenceCandidates, 
 			DOI:               candidate.DOI,
 			URL:               candidate.URL,
 			Abstract:          candidate.Abstract,
+			Venue:             candidate.Venue,
 			SourceMaterialIDs: []string{},
 			ConfirmedAt:       decision.ConfirmedAt,
 		})
@@ -172,6 +173,7 @@ func FormatConfirmedBibTeX(confirmed contracts.ConfirmedReferences) string {
 		}
 		writeBibField(&b, "doi", ref.DOI)
 		writeBibField(&b, "url", ref.URL)
+		writeBibField(&b, "journal", ref.Venue)
 		writeBibField(&b, "abstract", ref.Abstract)
 		b.WriteString("}\n\n")
 	}

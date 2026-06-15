@@ -52,10 +52,13 @@ type Result struct {
 }
 
 type Options struct {
-	Requirements contracts.Requirements
-	Providers    []Provider
-	HTTPClient   *http.Client
-	Limit        int
+	Requirements      contracts.Requirements
+	Providers         []Provider
+	HTTPClient        *http.Client
+	Limit             int
+	ExpansionEnabled  bool
+	MinCandidateCount int
+	ExpansionLimit    int
 }
 
 type HTTPProviderConfig struct {
@@ -79,6 +82,46 @@ func QueryFromRequirements(req contracts.Requirements, limit int) Query {
 		Language: req.Language,
 		Limit:    limit,
 	}
+}
+
+func ExpansionQueriesFromRequirements(req contracts.Requirements, base Query, needed int) []Query {
+	if needed <= 0 {
+		return nil
+	}
+	limit := base.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	var texts []string
+	for _, preference := range req.ChapterPreferences {
+		preference = strings.TrimSpace(preference)
+		if preference != "" {
+			texts = append(texts, strings.TrimSpace(req.Topic+" "+preference))
+		}
+	}
+	for _, question := range req.ResearchQuestions {
+		question = strings.TrimSpace(question)
+		if question != "" {
+			texts = append(texts, strings.TrimSpace(question+" evidence literature review"))
+		}
+	}
+	if len(texts) == 0 && strings.TrimSpace(req.Topic) != "" {
+		texts = append(texts, strings.TrimSpace(req.Topic+" systematic review empirical study"))
+	}
+	seen := map[string]bool{strings.ToLower(strings.TrimSpace(base.Text)): true}
+	var queries []Query
+	for _, text := range texts {
+		key := strings.ToLower(strings.TrimSpace(text))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		queries = append(queries, Query{Text: text, Scope: req.Scope, Language: req.Language, Limit: limit})
+		if len(queries) >= needed {
+			break
+		}
+	}
+	return queries
 }
 
 func normalizeProviderError(source string, err error) ProviderError {

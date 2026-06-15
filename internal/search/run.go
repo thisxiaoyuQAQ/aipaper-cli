@@ -44,30 +44,11 @@ func Run(ctx context.Context, s store.Store, opts Options) (Result, error) {
 
 	var all []contracts.ReferenceCandidate
 	for _, provider := range providers {
-		candidates, err := provider.Search(ctx, query)
-		if err != nil {
-			result.Errors = append(result.Errors, normalizeProviderError(provider.Name(), err))
-			continue
-		}
-		for _, candidate := range candidates {
-			if candidate.Status == "" {
-				candidate.Status = "pending"
-			}
-			if candidate.Source == "" {
-				candidate.Source = provider.Name()
-			}
-			if err := validateCandidate(candidate); err != nil {
-				result.Errors = append(result.Errors, ProviderError{
-					Code:      CodeSearchFieldMissing,
-					Source:    provider.Name(),
-					Message:   err.Error(),
-					Retryable: false,
-				})
-				continue
-			}
-			all = append(all, candidate)
-		}
+		candidates, providerErrors := searchProvider(ctx, provider, query, "")
+		all = append(all, candidates...)
+		result.Errors = append(result.Errors, providerErrors...)
 	}
+	all, result.Errors = expandCandidates(ctx, all, query, providers, opts, result.Errors)
 
 	deduped := references.DedupeCandidates(all)
 	result.Candidates.Items = references.AssignCandidateIDs(deduped, 1)
@@ -79,6 +60,72 @@ func Run(ctx context.Context, s store.Store, opts Options) (Result, error) {
 		})
 	}
 	return writeResult(s, result)
+}
+
+func searchProvider(ctx context.Context, provider Provider, query Query, expansionSource string) ([]contracts.ReferenceCandidate, []ProviderError) {
+	candidates, err := provider.Search(ctx, query)
+	if err != nil {
+		return nil, []ProviderError{normalizeProviderError(provider.Name(), err)}
+	}
+	var out []contracts.ReferenceCandidate
+	var errors []ProviderError
+	for _, candidate := range candidates {
+		if candidate.Status == "" {
+			candidate.Status = "pending"
+		}
+		if candidate.Source == "" {
+			candidate.Source = provider.Name()
+		}
+		if expansionSource != "" {
+			candidate.ExpansionSource = expansionSource
+			if strings.TrimSpace(candidate.RelevanceReason) == "" {
+				candidate.RelevanceReason = "Expanded from query: " + expansionSource
+			}
+		}
+		if err := validateCandidate(candidate); err != nil {
+			errors = append(errors, ProviderError{
+				Code:      CodeSearchFieldMissing,
+				Source:    provider.Name(),
+				Message:   err.Error(),
+				Retryable: false,
+			})
+			continue
+		}
+		out = append(out, candidate)
+	}
+	return out, errors
+}
+
+func expandCandidates(ctx context.Context, current []contracts.ReferenceCandidate, base Query, providers []Provider, opts Options, errors []ProviderError) ([]contracts.ReferenceCandidate, []ProviderError) {
+	if !opts.ExpansionEnabled {
+		return current, errors
+	}
+	minCandidates := opts.MinCandidateCount
+	if minCandidates <= 0 {
+		minCandidates = opts.Limit
+	}
+	if minCandidates <= 0 {
+		minCandidates = 10
+	}
+	if len(references.DedupeCandidates(current)) >= minCandidates {
+		return current, errors
+	}
+	expansionLimit := opts.ExpansionLimit
+	if expansionLimit <= 0 {
+		expansionLimit = 3
+	}
+	queries := ExpansionQueriesFromRequirements(opts.Requirements, base, expansionLimit)
+	for _, expansionQuery := range queries {
+		for _, provider := range providers {
+			candidates, providerErrors := searchProvider(ctx, provider, expansionQuery, expansionQuery.Text)
+			errors = append(errors, providerErrors...)
+			current = append(current, candidates...)
+			if len(references.DedupeCandidates(current)) >= minCandidates {
+				return current, errors
+			}
+		}
+	}
+	return current, errors
 }
 
 func writeResult(s store.Store, result Result) (Result, error) {

@@ -86,6 +86,45 @@ func TestRunSearchesDedupesAndWritesCandidates(t *testing.T) {
 	}
 }
 
+func TestRunExpandsWhenCandidateCountBelowTarget(t *testing.T) {
+	s := store.NewAt(filepath.Join(t.TempDir(), "store"))
+	req := contracts.Requirements{
+		Topic:              "genshin impact marketing",
+		ResearchQuestions:  []string{"How do player reviews shape marketing?"},
+		ChapterPreferences: []string{"wuthering waves player feedback"},
+		AllowOnlineSearch:  true,
+	}
+	var queries []string
+	provider := providerFunc{name: "semantic_scholar", fn: func(_ context.Context, query Query) ([]contracts.ReferenceCandidate, error) {
+		queries = append(queries, query.Text)
+		if len(queries) == 1 {
+			return []contracts.ReferenceCandidate{{Title: "Initial Paper", Authors: []string{"A"}, Year: 2024, Source: "semantic_scholar"}}, nil
+		}
+		return []contracts.ReferenceCandidate{{Title: "Expanded Paper", Authors: []string{"B"}, Year: 2025, Source: "semantic_scholar"}}, nil
+	}}
+
+	result, err := Run(context.Background(), s, Options{
+		Requirements:      req,
+		Providers:         []Provider{provider},
+		Limit:             1,
+		ExpansionEnabled:  true,
+		MinCandidateCount: 2,
+		ExpansionLimit:    1,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(queries) != 2 {
+		t.Fatalf("queries = %#v", queries)
+	}
+	if len(result.Candidates.Items) != 2 {
+		t.Fatalf("candidates = %#v", result.Candidates.Items)
+	}
+	if result.Candidates.Items[1].ExpansionSource == "" || !strings.Contains(result.Candidates.Items[1].RelevanceReason, "Expanded from query") {
+		t.Fatalf("expanded candidate = %#v", result.Candidates.Items[1])
+	}
+}
+
 func TestRunWritesEmptyCandidatesWhenOnlineSearchDisabled(t *testing.T) {
 	s := store.NewAt(filepath.Join(t.TempDir(), "store"))
 	result, err := Run(context.Background(), s, Options{

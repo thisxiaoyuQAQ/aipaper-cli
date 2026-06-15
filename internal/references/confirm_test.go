@@ -22,6 +22,7 @@ func TestConfirmCandidatesWritesConfirmedRejectedAndBibTeX(t *testing.T) {
 			Year:     2024,
 			DOI:      "10.1000/rag",
 			Abstract: "abstract",
+			Venue:    "Journal of AI Writing",
 			Status:   "pending",
 		},
 		{
@@ -59,6 +60,9 @@ func TestConfirmCandidatesWritesConfirmedRejectedAndBibTeX(t *testing.T) {
 	if result.Confirmed.Items[0].ConfirmedAt != now {
 		t.Fatalf("confirmed_at = %s", result.Confirmed.Items[0].ConfirmedAt)
 	}
+	if result.Confirmed.Items[0].Venue != "Journal of AI Writing" {
+		t.Fatalf("venue = %q", result.Confirmed.Items[0].Venue)
+	}
 	if result.Rejected.Items[0].Status != "rejected" {
 		t.Fatalf("rejected = %#v", result.Rejected.Items[0])
 	}
@@ -71,7 +75,7 @@ func TestConfirmCandidatesWritesConfirmedRejectedAndBibTeX(t *testing.T) {
 		t.Fatalf("written confirmed = %#v", written)
 	}
 	bib := readFile(t, s.Path("references", "confirmed.bib"))
-	if !strings.Contains(bib, "@article{smith2024RetrievalAugmentedGeneration") || !strings.Contains(bib, "doi = {10.1000/rag}") {
+	if !strings.Contains(bib, "@article{smith2024RetrievalAugmentedGeneration") || !strings.Contains(bib, "doi = {10.1000/rag}") || !strings.Contains(bib, "journal = {Journal of AI Writing}") {
 		t.Fatalf("bibtex = %s", bib)
 	}
 }

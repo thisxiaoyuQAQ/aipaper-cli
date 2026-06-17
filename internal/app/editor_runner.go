@@ -260,7 +260,29 @@ func (e *EditorLLMRunner) runReview(ctx context.Context, chapterID string) (any,
 	gate := artifacts.StatusAfterReview(review, revisionRounds)
 	conclusion, qualityOutcome := e.qualityConclusion(s, chapterID, revisionRounds, gate)
 
-	if err := e.rc.recordStepCheckpoint("review_chapter", nextAfterReview(gate), writeResult.Outputs, func(p *contracts.Progress) {
+	// BUG-20260617-01 fix: auto-commit accepted chapters immediately after review
+	// passes the quality gate, rather than relying on Coordinator to call
+	// editor_run commit as a separate step. This ensures accepted.md is always
+	// created when the gate passes, preventing export failures.
+	var acceptedArtifact *checkpoint.OutputArtifact
+	if gate.Passed && gate.Status == artifacts.StatusAccepted {
+		accepted, err := artifacts.CommitAccepted(s, chapterID, version, review)
+		if err != nil {
+			return nil, fmt.Errorf("auto-commit accepted chapter %s v%d: %w", chapterID, version, err)
+		}
+		acceptedArtifact = &accepted
+		e.rc.event(runEventRoleLog, chapterID,
+			fmt.Sprintf("chapter %s v%d passed quality gate, auto-committed to accepted.md", chapterID, version),
+			nil)
+	}
+
+	// Collect outputs: review artifacts + optional accepted.md
+	outputs := writeResult.Outputs
+	if acceptedArtifact != nil {
+		outputs = append(outputs, *acceptedArtifact)
+	}
+
+	if err := e.rc.recordStepCheckpoint("review_chapter", nextAfterReview(gate), outputs, func(p *contracts.Progress) {
 		p.CurrentChapter = chapterID
 	}); err != nil {
 		return nil, err
@@ -292,6 +314,10 @@ func (e *EditorLLMRunner) runReview(ctx context.Context, chapterID string) (any,
 	}
 	if qualityOutcome != nil {
 		result["quality_gate"] = qualityOutcome
+	}
+	if acceptedArtifact != nil {
+		result["accepted"] = acceptedArtifact.Path
+		result["auto_committed"] = true
 	}
 	return result, nil
 }

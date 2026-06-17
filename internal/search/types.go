@@ -66,7 +66,15 @@ type HTTPProviderConfig struct {
 	BaseURL string
 }
 
+// QueryFromRequirements generates a single query from requirements.
+// Deprecated: Use GenerateQueries for better Chinese query support.
+// Kept for backward compatibility.
 func QueryFromRequirements(req contracts.Requirements, limit int) Query {
+	queries := GenerateQueries(req, limit)
+	if len(queries) > 0 {
+		return queries[0].Query
+	}
+	// Fallback to old logic if no queries generated
 	if limit <= 0 {
 		limit = 10
 	}
@@ -84,43 +92,64 @@ func QueryFromRequirements(req contracts.Requirements, limit int) Query {
 	}
 }
 
+// ExpansionQueriesFromRequirements generates expansion queries.
+// Deprecated: Use GenerateExpansionQueries for better Chinese query support.
+// Kept for backward compatibility.
 func ExpansionQueriesFromRequirements(req contracts.Requirements, base Query, needed int) []Query {
 	if needed <= 0 {
 		return nil
 	}
-	limit := base.Limit
-	if limit <= 0 {
-		limit = 10
+
+	// Convert base Query to QueryWithMetadata for new API
+	baseWithMeta := QueryWithMetadata{
+		Query:    base,
+		Strategy: SelectStrategy(req),
 	}
-	var texts []string
-	for _, preference := range req.ChapterPreferences {
-		preference = strings.TrimSpace(preference)
-		if preference != "" {
-			texts = append(texts, strings.TrimSpace(req.Topic+" "+preference))
-		}
-	}
-	for _, question := range req.ResearchQuestions {
-		question = strings.TrimSpace(question)
-		if question != "" {
-			texts = append(texts, strings.TrimSpace(question+" evidence literature review"))
-		}
-	}
-	if len(texts) == 0 && strings.TrimSpace(req.Topic) != "" {
-		texts = append(texts, strings.TrimSpace(req.Topic+" systematic review empirical study"))
-	}
-	seen := map[string]bool{strings.ToLower(strings.TrimSpace(base.Text)): true}
+
+	queriesWithMeta := GenerateExpansionQueries(req, baseWithMeta, needed)
+
+	// Convert back to plain Query slice
 	var queries []Query
-	for _, text := range texts {
-		key := strings.ToLower(strings.TrimSpace(text))
-		if key == "" || seen[key] {
-			continue
+	for _, q := range queriesWithMeta {
+		queries = append(queries, q.Query)
+	}
+
+	// Fallback to old logic if no queries generated
+	if len(queries) == 0 {
+		limit := base.Limit
+		if limit <= 0 {
+			limit = 10
 		}
-		seen[key] = true
-		queries = append(queries, Query{Text: text, Scope: req.Scope, Language: req.Language, Limit: limit})
-		if len(queries) >= needed {
-			break
+		var texts []string
+		for _, preference := range req.ChapterPreferences {
+			preference = strings.TrimSpace(preference)
+			if preference != "" {
+				texts = append(texts, strings.TrimSpace(req.Topic+" "+preference))
+			}
+		}
+		for _, question := range req.ResearchQuestions {
+			question = strings.TrimSpace(question)
+			if question != "" {
+				texts = append(texts, strings.TrimSpace(question+" evidence literature review"))
+			}
+		}
+		if len(texts) == 0 && strings.TrimSpace(req.Topic) != "" {
+			texts = append(texts, strings.TrimSpace(req.Topic+" systematic review empirical study"))
+		}
+		seen := map[string]bool{strings.ToLower(strings.TrimSpace(base.Text)): true}
+		for _, text := range texts {
+			key := strings.ToLower(strings.TrimSpace(text))
+			if key == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			queries = append(queries, Query{Text: text, Scope: req.Scope, Language: req.Language, Limit: limit})
+			if len(queries) >= needed {
+				break
+			}
 		}
 	}
+
 	return queries
 }
 

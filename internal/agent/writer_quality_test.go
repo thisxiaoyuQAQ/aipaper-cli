@@ -94,6 +94,14 @@ func TestBuildWriterChapterInputInjectsPlanAndEvidence(t *testing.T) {
 	if len(input.Warnings) != 0 {
 		t.Fatalf("warnings = %#v", input.Warnings)
 	}
+	guidance := strings.Join(input.TemplateGuidance, "\n")
+	if !strings.Contains(guidance, "Paper quality writing policy") || !strings.Contains(guidance, "writer_notes") {
+		t.Fatalf("template guidance missing paper quality policy: %s", guidance)
+	}
+	forbidden := strings.Join(input.ForbiddenDraftPatterns, "\n")
+	if !strings.Contains(forbidden, "证据不足") || !strings.Contains(forbidden, "metadata_only") {
+		t.Fatalf("forbidden patterns missing paper quality policy: %s", forbidden)
+	}
 }
 
 func TestBuildWriterChapterInputCompatWithoutQualityArtifacts(t *testing.T) {

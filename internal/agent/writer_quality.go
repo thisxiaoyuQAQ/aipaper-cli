@@ -118,12 +118,19 @@ func attachWriterPolicy(s store.Store, input *WriterChapterInput) {
 		input.TemplateGuidance = append([]string(nil), template.WriterGuidance...)
 		input.ForbiddenDraftPatterns = append([]string(nil), template.ForbiddenDraftPatterns...)
 		input.MinEvidencePerChapter = template.MinEvidencePerChapter
+		attachPaperQualityWriterPolicy(input)
 		return
 	}
 	template := quality.ResolveArticleTemplate(input.ArticleTemplate)
 	input.TemplateGuidance = append([]string(nil), template.WriterGuidance...)
 	input.ForbiddenDraftPatterns = append([]string(nil), template.ForbiddenDraftPatterns...)
 	input.MinEvidencePerChapter = template.MinEvidencePerChapter
+	attachPaperQualityWriterPolicy(input)
+}
+
+func attachPaperQualityWriterPolicy(input *WriterChapterInput) {
+	input.TemplateGuidance = append(input.TemplateGuidance, quality.PaperQualityWriterSections()...)
+	input.ForbiddenDraftPatterns = append(input.ForbiddenDraftPatterns, quality.PaperQualityForbiddenDraftPatterns()...)
 }
 
 // GuardWriterClaims hard-validates writer claims before chapter artifacts are

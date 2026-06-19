@@ -32,6 +32,18 @@
 - Editor 验证结果写入 Claim Graph 和 `quality/verification-result.json`。
 - 导出阶段生成 citation trace、报告和可选的质量引擎报告。
 
+### 质量引擎与 Paper Quality Policy
+
+运行时内置一份本地论文质量策略（`paper-cli-paper-quality-v1`），由 `internal/quality/paper_quality_policy.go` 提供。该策略在执行时被注入到各角色 prompt，而不是运行时读取外部 `docs/skills` 文件：
+
+- `Coordinator`：硬性规则与角色边界（Host 做机器校验，Coordinator 依据工具事实做流程决策，角色 Agent 在既有 JSON 契约内做语义判断）。
+- `Architect`：叙事契约（围绕一条证据有界的论点设计论文，而非罗列材料）、大纲去重、证据深度约束。
+- `Writer`：每个重要 claim 必须出现在 `claims[]` 并绑定已确认 `evidence_ids`；措辞强度匹配证据深度；禁止把「证据不足/待验证/只能提出框架」写成正文体。
+- `Verifier`：claim 支撑度判定（descriptive / comparative / causal / generalization / methodological / limitation / reproducibility），同对象、同关系、同范围才视为支撑；仅输出既有 `ClaimVerdict` 契约。
+- `Editor`：区分语言问题、证据问题与结构问题；unsupported / overstated / 高风险 claim 必须给出带位置、问题、指令与 `suggested_evidence_ids` 的重写指令；需要新证据或领域判断时标记人工复核或 gap。
+
+硬性门控在所有模式下都不能静默通过：未确认引用、claim 缺少 evidence id、evidence 指向不存在或未确认 reference key。`quality/verification-result.json` 记录 verifier 判定，`quality/claim-graph.*` 记录 claim 图。
+
 ## 快速开始
 
 ### 前置要求
@@ -90,12 +102,12 @@ paper-cli config   [--workdir DIR] [--config FILE]
 
 ConfigWizard 当前内置模板如下：
 
-| Provider | Type | 默认模型 | Base URL | API Key |
-|---|---|---|---|---|
-| OpenAI | `openai` | `gpt-5.5` | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
-| Anthropic | `anthropic` | `claude-opus-4-8` | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
-| Ollama | `ollama` | `llama3` | `http://localhost:11434` | 不需要 |
-| Custom | 自定义 | 自定义 | 自定义 | `CUSTOM_LLM_API_KEY` |
+| Provider  | Type          | 默认模型            | Base URL                      | API Key                |
+| --------- | ------------- | ------------------- | ----------------------------- | ---------------------- |
+| OpenAI    | `openai`    | `gpt-5.5`         | `https://api.openai.com/v1` | `OPENAI_API_KEY`     |
+| Anthropic | `anthropic` | `claude-opus-4-8` | `https://api.anthropic.com` | `ANTHROPIC_API_KEY`  |
+| Ollama    | `ollama`    | `llama3`          | `http://localhost:11434`    | 不需要                 |
+| Custom    | 自定义        | 自定义              | 自定义                        | `CUSTOM_LLM_API_KEY` |
 
 推荐使用 `env:VAR_NAME` 引用环境变量，避免把密钥明文写入 `aipaper.json`。运行时会解析 `env:` 值；如果环境变量不存在，会返回明确错误。
 
@@ -129,28 +141,28 @@ ConfigWizard 当前内置模板如下：
 
 Requirements 表单会生成结构化 `requirements.json`，主要字段包括：
 
-| 字段 | 说明 | 示例 |
-|---|---|---|
-| `topic` | 综述主题 | `大语言模型在代码生成中的应用` |
-| `research_questions` | 研究问题 | 多行输入 |
-| `scope` | 综述范围 | `聚焦 2022-2024 年研究` |
-| `language` | 目标语言 | `zh-CN` 或 `en` |
-| `citation_style` | 引用格式 | `gbt7714` 或 `apa` |
-| `quality_mode` | 质量模式 | `fast`、`enhanced`、`strict` |
-| `target_words` | 目标字数 | `8000` |
-| `material_dir` | 材料目录 | `./materials` |
-| `allow_online_search` | 是否允许联网搜索 | `true` 或 `false` |
-| `search_providers` | 搜索源 | `semantic_scholar, crossref` |
+| 字段                    | 说明             | 示例                               |
+| ----------------------- | ---------------- | ---------------------------------- |
+| `topic`               | 综述主题         | `大语言模型在代码生成中的应用`   |
+| `research_questions`  | 研究问题         | 多行输入                           |
+| `scope`               | 综述范围         | `聚焦 2022-2024 年研究`          |
+| `language`            | 目标语言         | `zh-CN` 或 `en`                |
+| `citation_style`      | 引用格式         | `gbt7714` 或 `apa`             |
+| `quality_mode`        | 质量模式         | `fast`、`enhanced`、`strict` |
+| `target_words`        | 目标字数         | `8000`                           |
+| `material_dir`        | 材料目录         | `./materials`                    |
+| `allow_online_search` | 是否允许联网搜索 | `true` 或 `false`              |
+| `search_providers`    | 搜索源           | `semantic_scholar, crossref`     |
 
 默认需求使用 `zh-CN`、`gbt7714`、`8000` 字、`./materials`、允许在线搜索，默认搜索源为 Semantic Scholar 和 Crossref。`quality_mode` 为空时按 `enhanced` 处理。
 
 ### 质量模式
 
-| 模式 | 行为 |
-|---|---|
-| `fast` | 跳过逐条 claim 验证，风险项以警告为主。 |
-| `enhanced` | 默认模式，逐条验证 claim 支撑度，unsupported 或 overstated 会触发重写。 |
-| `strict` | 在 enhanced 基础上提高门控严格度，浅证据支撑强结论等中等风险也会升级处理。 |
+| 模式         | 行为                                                                       |
+| ------------ | -------------------------------------------------------------------------- |
+| `fast`     | 跳过逐条 claim 验证，风险项以警告为主。                                    |
+| `enhanced` | 默认模式，逐条验证 claim 支撑度，unsupported 或 overstated 会触发重写。    |
+| `strict`   | 在 enhanced 基础上提高门控严格度，浅证据支撑强结论等中等风险也会升级处理。 |
 
 所有模式都遵守硬性门控：未确认引用、claim 缺少 evidence id、evidence 指向不存在或未确认 reference key，都不能静默通过。
 
@@ -258,6 +270,20 @@ output/aipaper/
 
 部分质量文件只会在 enhanced/strict 路径或质量产物可用时生成；旧项目或兼容模式下，`final/quality-report.md` 可能不生成，但 `final/report.md` 会记录兼容提示。
 
+### `final/quality-report.md`
+
+质量引擎报告，基于已加载的质量产物在本地渲染（不调用 LLM）。报告头部记录 `Paper Quality policy` 版本（`paper-cli-paper-quality-v1`）、质量模式、整体状态、claim 校验数与 verifier 判定数，正文包含以下小节：
+
+- **Hard Gate Summary**：硬阻断项与风险发现表。
+- **Evidence Depth Distribution**：`metadata_only` / `abstract` / `snippet` / `fulltext_excerpt` 证据深度分布。
+- **Claim Support Summary**：`supported` / `partially_supported` / `unsupported` / `overstated` / `skipped` / `unverified` 计数。
+- **Unsupported / Overstated Claims**：逐条列出问题 claim 及 verifier note。
+- **Evidence Sufficiency and Content Signals**：证据不足、必需证据未使用、metadata_only 独占支撑、低内容信号等发现。
+- **Human Action Items**：可执行的人工处理建议（重写/弱化/补证据/人工复核）。
+- **Needs Human Review**：strict 模式下高优先项、待复核章节与发现表。
+- **Rewrite Summary**：各章重写轮次、必需/可选重写指令数与收敛状态（`converged` / `needs_revision` / `needs_human_review`）。
+- **Suggested Next Human Edits**：发布前建议的人工修订步骤。
+
 ### `final/citation-trace.json`
 
 Citation trace 是扁平列表，每条记录描述一个段落中的 claim 与已确认文献之间的关系：
@@ -332,21 +358,21 @@ go test -v ./internal/e2e
 
 常见模块：
 
-| 路径 | 职责 |
-|---|---|
-| `cmd/aipaper-cli/` | CLI/TUI 入口 |
-| `internal/cli/` | `init`、`status`、`recover`、`config` 命令 |
-| `internal/tui/` | ConfigWizard、Requirements、MaterialsScan、SearchProgress、References、WritingProgress 等界面 |
-| `internal/app/` | Bootstrap、AgentRuntime、角色 Runner |
-| `internal/config/` | 配置加载、合并、校验、脱敏 |
-| `internal/store/` | Store 路径、布局、原子写入、哈希 |
-| `internal/materials/` | 材料扫描与解析 |
-| `internal/search/` | 学术搜索 Provider |
-| `internal/references/` | 候选、确认、拒绝文献管理 |
-| `internal/agent/` | Coordinator、角色工具、质量协议 |
-| `internal/quality/` | Evidence、Section Plan、Claim Graph、Verification、Gate |
-| `internal/artifacts/` | 草稿、claim、citation map、review、accepted chapter 写入 |
-| `internal/export/` | Markdown、DOCX、引用追踪和报告导出 |
+| 路径                     | 职责                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `cmd/aipaper-cli/`     | CLI/TUI 入口                                                                                  |
+| `internal/cli/`        | `init`、`status`、`recover`、`config` 命令                                            |
+| `internal/tui/`        | ConfigWizard、Requirements、MaterialsScan、SearchProgress、References、WritingProgress 等界面 |
+| `internal/app/`        | Bootstrap、AgentRuntime、角色 Runner                                                          |
+| `internal/config/`     | 配置加载、合并、校验、脱敏                                                                    |
+| `internal/store/`      | Store 路径、布局、原子写入、哈希                                                              |
+| `internal/materials/`  | 材料扫描与解析                                                                                |
+| `internal/search/`     | 学术搜索 Provider                                                                             |
+| `internal/references/` | 候选、确认、拒绝文献管理                                                                      |
+| `internal/agent/`      | Coordinator、角色工具、质量协议                                                               |
+| `internal/quality/`    | Evidence、Section Plan、Claim Graph、Verification、Gate                                       |
+| `internal/artifacts/`  | 草稿、claim、citation map、review、accepted chapter 写入                                      |
+| `internal/export/`     | Markdown、DOCX、引用追踪和报告导出                                                            |
 
 ## 常见问题
 
@@ -392,11 +418,15 @@ DOCX 使用基础导出器。导出失败时，`final/paper.md`、`final/referen
 - [用户指南（详细版）](docs/user-guide.md)：完整安装、配置、材料准备、生成、导出、恢复说明。
 - [需求与架构](docs/需求与架构.md)：设计背景、技术选型、模块设计。
 - [接口契约索引](docs/interfaces/_index.md)：JSON Schema 与契约定义。
+- [Paper Quality Skill 运行时设计](docs/superpowers/specs/2026-06-20-paper-quality-skill-runtime-design.md)：质量策略本地化注入与质量引擎设计。
+- [质量接口契约](docs/interfaces/quality.md)：Evidence、Section Plan、Claim Graph、Verification、Gate 契约。
 - [开发进度](docs/开发进度.md)：开发日志与版本历史。
 
 ## 许可证
 
-本项目目前未指定开源许可证。如需商业使用或二次分发，请联系作者。
+本项目基于 [MIT License](LICENSE) 开源。任何人可自由使用、复制、修改、合并、发布、分发、再授权或销售本软件，仅需在所有副本中保留版权声明与本许可证声明。
+
+版权所有 © 2026 thisxiaoyuQAQ。
 
 ## 致谢
 

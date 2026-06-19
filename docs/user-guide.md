@@ -194,6 +194,16 @@ Requirements 表单收集主题、研究问题、综述范围、目标语言、�
 
 无论哪档模式，底线问题都会硬阻断：引用未确认文献、claim 没有 evidence id、evidence 或 claim 指向不存在的 reference key。
 
+#### Paper Quality Policy
+
+运行时内置一份本地论文质量策略（`paper-cli-paper-quality-v1`，见 `internal/quality/paper_quality_policy.go`），在执行时注入到各角色 prompt，而非运行时读取外部 `docs/skills` 文件：
+
+- `Coordinator`：硬性规则与角色边界（Host 做机器校验，Coordinator 依据工具事实做流程决策，角色 Agent 在既有 JSON 契约内做语义判断）。
+- `Architect`：围绕一条证据有界的论点设计论文，而非罗列材料；大纲去重；证据深度约束。
+- `Writer`：每个重要 claim 必须出现在 `claims[]` 并绑定已确认 `evidence_ids`；措辞强度匹配证据深度；禁止把「证据不足/待验证/只能提出框架」写成正文体。
+- `Verifier`：claim 支撑度判定（同对象、同关系、同范围才视为支撑），仅输出既有 `ClaimVerdict` 契约。
+- `Editor`：区分语言、证据与结构问题；unsupported / overstated / 高风险 claim 必须给出带位置与 `suggested_evidence_ids` 的重写指令；需要新证据或领域判断时标记人工复核或 gap。
+
 ### MaterialsScan
 
 MaterialsScan 扫描材料目录并写入：
@@ -295,6 +305,8 @@ accepted/{chapter_id}.md
 | `final/citation-trace.json` | 引用追踪，连接章节、段落、claim 和 reference key。 |
 | `final/report.md` | 导出报告，包含输出、问题、质量摘要和兼容提示。 |
 | `final/quality-report.md` | 质量引擎报告；只有质量产物可用时生成。 |
+
+`final/quality-report.md` 由本地渲染（不调用 LLM），头部记录 `Paper Quality policy` 版本（`paper-cli-paper-quality-v1`）、质量模式、整体状态、claim 校验数与 verifier 判定数，正文包含：Hard Gate Summary（硬阻断与风险发现）、Evidence Depth Distribution（证据深度分布）、Claim Support Summary（支撑度计数）、Unsupported / Overstated Claims、Evidence Sufficiency and Content Signals、Human Action Items、Needs Human Review（strict 高优先项 + 待复核章节）、Rewrite Summary（各章重写轮次与收敛状态）、Suggested Next Human Edits。
 
 `final/citation-trace.json` 示例：
 

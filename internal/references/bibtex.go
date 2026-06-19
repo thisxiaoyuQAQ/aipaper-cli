@@ -79,16 +79,19 @@ func CandidatesFromBibTeX(entries []BibTeXEntry, startIndex int) []contracts.Ref
 		doi := fields["doi"]
 		url := fields["url"]
 		candidate := contracts.ReferenceCandidate{
-			ID:       fmt.Sprintf("cand_%03d", startIndex+i),
-			Title:    title,
-			Authors:  splitAuthors(fields["author"]),
-			Year:     parseYear(fields["year"]),
-			Source:   "bibtex",
-			DOI:      doi,
-			URL:      url,
-			Abstract: fields["abstract"],
-			Venue:    firstNonEmpty(fields["journal"], fields["booktitle"], fields["publisher"]),
-			Status:   "pending",
+			ID:           fmt.Sprintf("cand_%03d", startIndex+i),
+			Title:        title,
+			Authors:      splitAuthors(fields["author"]),
+			Year:         parseYear(fields["year"]),
+			Source:       "bibtex",
+			DOI:          doi,
+			URL:          url,
+			Abstract:     fields["abstract"],
+			Venue:        firstNonEmpty(fields["journal"], fields["booktitle"], fields["publisher"]),
+			Status:       "pending",
+			Reliability:  "user_export",
+			Availability: availabilityFromURLAndDOI(url, doi),
+			AccessURL:    url,
 		}
 		candidate.DedupeGroup = CandidateDedupeGroup(candidate)
 		candidates = append(candidates, candidate)

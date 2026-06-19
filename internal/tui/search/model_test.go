@@ -3,6 +3,7 @@ package search
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
@@ -11,6 +12,34 @@ import (
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
 	materialstui "github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/materials"
 )
+
+func TestSearchProgress_UsesExpandedReferenceSearchDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+	s := store.New(tmpDir)
+	if err := store.EnsureLayout(s); err != nil {
+		t.Fatal(err)
+	}
+
+	var captured domainsearch.Options
+	searchFn := func(ctx context.Context, s store.Store, opts domainsearch.Options) (domainsearch.Result, error) {
+		captured = opts
+		return domainsearch.Result{}, nil
+	}
+
+	m := NewModel(Options{
+		WorkDir: tmpDir,
+		Store:   s,
+		Requirements: contracts.Requirements{
+			AllowOnlineSearch: true,
+		},
+		Search: searchFn,
+	})
+	_ = m.searchCmd()()
+
+	if captured.Limit != 20 || captured.MinCandidateCount != 30 || captured.ExpansionLimit != 5 || !captured.ExpansionEnabled {
+		t.Fatalf("search options = %#v", captured)
+	}
+}
 
 func TestSearchProgress_SearchDisabled_MaterialCandidatesRetained(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -233,7 +262,7 @@ func TestSearchProgress_ProviderPartialFailure_DoesNotBlock(t *testing.T) {
 				{Title: "Paper from provider 1", Authors: []string{"Author A"}, Source: "semantic_scholar", Status: "pending"},
 			}},
 			Errors: []domainsearch.ProviderError{
-				{Code: "TIMEOUT", Source: "crossref", Message: "request timeout", Retryable: true},
+				{Code: domainsearch.CodeSearchTimeout, Source: "crossref", Message: "request timeout", Retryable: true},
 			},
 		}, nil
 	}
@@ -262,6 +291,12 @@ func TestSearchProgress_ProviderPartialFailure_DoesNotBlock(t *testing.T) {
 	}
 	if len(m.finalCandidates) != 1 {
 		t.Errorf("expected 1 final candidate, got %d", len(m.finalCandidates))
+	}
+	view := m.View()
+	for _, want := range []string{"搜索进度", "搜索完成", "本地引用候选：0", "搜索候选：1", "最终候选（去重后）：1", "搜索源提示", "crossref: 请求超时，已继续使用其他来源", "按 Enter 继续"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("search view missing %q:\n%s", want, view)
+		}
 	}
 }
 
@@ -451,6 +486,41 @@ func TestSearchProgress_SearchError_CanRetry(t *testing.T) {
 	m, _ = m.UpdateKey("r")
 	if m.status != StatusSearching {
 		t.Errorf("expected retry to restart search, got status %s", m.status)
+	}
+}
+
+func TestSearchProgress_ShowsLocalReferenceHintForParsedMaterials(t *testing.T) {
+	tmpDir := t.TempDir()
+	s := store.New(tmpDir)
+	if err := store.EnsureLayout(s); err != nil {
+		t.Fatal(err)
+	}
+
+	m := NewModel(Options{
+		WorkDir: tmpDir,
+		Store:   s,
+		Requirements: contracts.Requirements{
+			AllowOnlineSearch: true,
+		},
+		MaterialsResult: materialstui.ScanResult{
+			Stats: materialstui.ScanStats{Parsed: 1},
+		},
+		Search: func(context.Context, store.Store, domainsearch.Options) (domainsearch.Result, error) {
+			return domainsearch.Result{
+				Candidates: contracts.ReferenceCandidates{Items: []contracts.ReferenceCandidate{
+					{Title: "Search Paper", Authors: []string{"Author"}, Source: "openalex", Status: "pending"},
+				}},
+			}, nil
+		},
+	})
+
+	msg := m.searchCmd()()
+	m.applySearchFinished(msg.(SearchFinishedMsg))
+	view := m.View()
+	for _, want := range []string{"本地引用候选：0", "只有 BibTeX/RIS/CSV 等文献导出文件会直接生成引用候选"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("search view missing %q:\n%s", want, view)
+		}
 	}
 }
 

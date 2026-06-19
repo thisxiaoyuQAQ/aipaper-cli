@@ -47,12 +47,24 @@ func FormatCandidatesMarkdown(candidates []contracts.ReferenceCandidate) string 
 		if candidate.Year != 0 {
 			fmt.Fprintf(&b, "- Year: %d\n", candidate.Year)
 		}
-		fmt.Fprintf(&b, "- Source: %s\n", candidate.Source)
+		fmt.Fprintf(&b, "- Source: %s\n", SourceLabel(candidate.Source))
 		if candidate.DOI != "" {
 			fmt.Fprintf(&b, "- DOI: %s\n", candidate.DOI)
 		}
 		if candidate.URL != "" {
 			fmt.Fprintf(&b, "- URL: %s\n", candidate.URL)
+		}
+		if label := AvailabilityLabel(candidate.Availability); label != "" {
+			fmt.Fprintf(&b, "- 可获取性：%s\n", label)
+		}
+		if label := ReliabilityLabel(candidate.Reliability); label != "" {
+			fmt.Fprintf(&b, "- 可靠性：%s\n", label)
+		}
+		if candidate.AccessURL != "" {
+			fmt.Fprintf(&b, "- 优先访问链接：%s\n", candidate.AccessURL)
+		}
+		if summary := CandidateSummary(candidate.Abstract); summary != "" {
+			fmt.Fprintf(&b, "- 概要：%s\n", summary)
 		}
 		if candidate.Venue != "" {
 			fmt.Fprintf(&b, "- Venue: %s\n", candidate.Venue)
@@ -62,9 +74,6 @@ func FormatCandidatesMarkdown(candidates []contracts.ReferenceCandidate) string 
 		}
 		if candidate.DedupeGroup != "" {
 			fmt.Fprintf(&b, "- Dedupe group: %s\n", candidate.DedupeGroup)
-		}
-		if candidate.Abstract != "" {
-			fmt.Fprintf(&b, "\n%s\n", candidate.Abstract)
 		}
 		b.WriteString("\n")
 	}

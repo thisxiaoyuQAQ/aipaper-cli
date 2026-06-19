@@ -132,6 +132,18 @@ func mergeCandidate(lower, higher contracts.ReferenceCandidate) contracts.Refere
 	if out.CitationCount == 0 {
 		out.CitationCount = lower.CitationCount
 	}
+	if out.Reliability == "" {
+		out.Reliability = lower.Reliability
+	}
+	if out.Availability == "" {
+		out.Availability = lower.Availability
+	}
+	if out.AccessURL == "" {
+		out.AccessURL = lower.AccessURL
+	}
+	if out.SourceID == "" {
+		out.SourceID = lower.SourceID
+	}
 	if out.RelevanceScore == 0 {
 		out.RelevanceScore = lower.RelevanceScore
 	}
@@ -169,6 +181,15 @@ func candidateCompleteness(candidate contracts.ReferenceCandidate) int {
 		score++
 	}
 	if candidate.CitationCount != 0 {
+		score++
+	}
+	if candidate.Reliability != "" {
+		score++
+	}
+	if candidate.Availability != "" {
+		score++
+	}
+	if candidate.AccessURL != "" {
 		score++
 	}
 	if candidate.RelevanceScore != 0 {

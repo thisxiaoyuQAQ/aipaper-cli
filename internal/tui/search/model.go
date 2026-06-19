@@ -54,12 +54,13 @@ type Model struct {
 	materialsResult materialstui.ScanResult
 	search          SearchFunc
 
-	status          Status
-	searchErrors    []domainsearch.ProviderError
-	searchOutputs   []string
-	finalCandidates []contracts.ReferenceCandidate
-	materialCount   int
-	searchCount     int
+	status              Status
+	searchErrors        []domainsearch.ProviderError
+	searchOutputs       []string
+	finalCandidates     []contracts.ReferenceCandidate
+	materialCount       int
+	parsedMaterialCount int
+	searchCount         int
 
 	action Action
 	err    error
@@ -89,14 +90,15 @@ func NewModel(opts Options) Model {
 		tr = i18n.New("")
 	}
 	return Model{
-		workDir:         workDir,
-		store:           s,
-		requirements:    opts.Requirements,
-		materialsResult: opts.MaterialsResult,
-		search:          searchFn,
-		status:          StatusSearching,
-		materialCount:   len(opts.MaterialsResult.Candidates),
-		i18n:            tr,
+		workDir:             workDir,
+		store:               s,
+		requirements:        opts.Requirements,
+		materialsResult:     opts.MaterialsResult,
+		search:              searchFn,
+		status:              StatusSearching,
+		materialCount:       len(opts.MaterialsResult.Candidates),
+		parsedMaterialCount: opts.MaterialsResult.Stats.Parsed + opts.MaterialsResult.Stats.Degraded,
+		i18n:                tr,
 	}
 }
 
@@ -237,10 +239,10 @@ func (m Model) searchCmd() tea.Cmd {
 		ctx := context.Background()
 		result, err := searchFn(ctx, s, domainsearch.Options{
 			Requirements:      requirements,
-			Limit:             10,
+			Limit:             20,
 			ExpansionEnabled:  true,
-			MinCandidateCount: 10,
-			ExpansionLimit:    3,
+			MinCandidateCount: 30,
+			ExpansionLimit:    5,
 		})
 		return SearchFinishedMsg{Result: result, Err: err}
 	}

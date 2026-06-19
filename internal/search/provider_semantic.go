@@ -62,6 +62,9 @@ func (p SemanticScholarProvider) Search(ctx context.Context, query Query) ([]con
 			Abstract:      item.Abstract,
 			Venue:         item.Venue,
 			CitationCount: item.CitationCount,
+			Reliability:   "official_api",
+			Availability:  candidateAvailability(item.URL, item.ExternalIDs.DOI),
+			AccessURL:     item.URL,
 		}
 		if err := validateCandidate(candidate); err != nil {
 			return nil, ProviderError{Code: CodeSearchFieldMissing, Source: p.Name(), Message: err.Error(), Retryable: false}

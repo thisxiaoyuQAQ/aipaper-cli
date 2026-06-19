@@ -12,20 +12,34 @@ import (
 )
 
 const (
+	OpenAlexProviderName        = "openalex"
 	SemanticScholarProviderName = "semantic_scholar"
 	CrossrefProviderName        = "crossref"
 	ArxivProviderName           = "arxiv"
 	PubMedProviderName          = "pubmed"
+	DOAJProviderName            = "doaj"
 )
 
 func DefaultProviders(cfg HTTPProviderConfig) []Provider {
 	client := defaultHTTPClient(cfg.Client)
 	return []Provider{
-		NewSemanticScholarProvider(HTTPProviderConfig{Client: client}),
+		NewOpenAlexProvider(HTTPProviderConfig{Client: client}),
 		NewCrossrefProvider(HTTPProviderConfig{Client: client}),
+		NewSemanticScholarProvider(HTTPProviderConfig{Client: client}),
 		NewArxivProvider(HTTPProviderConfig{Client: client}),
 		NewPubMedProvider(HTTPProviderConfig{Client: client}),
+		NewDOAJProvider(HTTPProviderConfig{Client: client}),
 	}
+}
+
+func candidateAvailability(urlValue, doi string) string {
+	if strings.TrimSpace(urlValue) != "" {
+		return "landing_page"
+	}
+	if strings.TrimSpace(doi) != "" {
+		return "doi_landing"
+	}
+	return "unknown"
 }
 
 func withStatusAndDedupe(candidate contracts.ReferenceCandidate) contracts.ReferenceCandidate {

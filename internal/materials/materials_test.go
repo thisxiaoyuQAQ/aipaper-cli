@@ -22,7 +22,7 @@ func TestProcessDirWritesManifestArtifactsAndBibTeXCandidates(t *testing.T) {
 	if len(result.Manifest.Items) != 7 {
 		t.Fatalf("manifest item len = %d", len(result.Manifest.Items))
 	}
-	if len(result.Candidates) != 1 {
+	if len(result.Candidates) != 3 {
 		t.Fatalf("candidates = %#v", result.Candidates)
 	}
 	if result.Candidates[0].ID != "cand_001" || result.Candidates[0].Source != "bibtex" {
@@ -95,6 +95,30 @@ func TestProcessDirHandlesMissingEmptyAndFailedMaterials(t *testing.T) {
 	if len(bad.Manifest.Items) != 1 || bad.Manifest.Items[0].Status != StatusFailed {
 		t.Fatalf("bad manifest = %#v", bad.Manifest)
 	}
+}
+
+func TestProcessDirParsesRISAndChineseCSVExports(t *testing.T) {
+	dir := t.TempDir()
+	writeText(t, filepath.Join(dir, "cnki.ris"), "TY  - JOUR\nTI  - 中文文献检索研究\nAU  - 张三\nPY  - 2024\nJO  - 情报杂志\nDO  - 10.1000/cnki\nUR  - https://example.cn/cnki\nAB  - 摘要\nER  - \n")
+	writeText(t, filepath.Join(dir, "wanfang.csv"), "题名,作者,年份,来源,DOI,链接,摘要\n国内文献数据库研究,李四；王五,2023,图书情报工作,10.1000/wanfang,https://example.cn/wanfang,中文摘要\n")
+
+	result, err := ProcessDir(dir, store.NewAt(filepath.Join(t.TempDir(), "store")))
+	if err != nil {
+		t.Fatalf("ProcessDir() error = %v", err)
+	}
+	if len(result.Candidates) != 2 {
+		t.Fatalf("candidates = %#v", result.Candidates)
+	}
+	if got := result.Candidates[0]; got.Source != "ris" || got.Title != "中文文献检索研究" || got.Reliability != "user_export" {
+		t.Fatalf("ris candidate = %#v", got)
+	}
+	if got := result.Candidates[1]; got.Source != "csv_export" || got.Title != "国内文献数据库研究" || got.Venue != "图书情报工作" || len(got.Authors) != 2 {
+		t.Fatalf("csv candidate = %#v", got)
+	}
+
+	items := itemsByPath(result.Manifest)
+	assertItem(t, items["cnki.ris"], "material_001", "ris", StatusParsed, "ris", false)
+	assertItem(t, items["wanfang.csv"], "material_002", "csv", StatusParsed, "csv_basic", true)
 }
 
 func TestProcessDirMarksDOCXAsDegraded(t *testing.T) {

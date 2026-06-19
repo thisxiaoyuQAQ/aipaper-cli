@@ -202,6 +202,19 @@ func parseMaterial(path string, candidateStart int) (parsedFile, error) {
 			fields:     map[string]any{"entry_count": len(entries), "entries": entries},
 			candidates: candidates,
 		}, nil
+	case "ris":
+		entries, err := references.ParseRIS(data)
+		if err != nil {
+			return parsedFile{kind: kind, parser: "ris"}, err
+		}
+		candidates := references.CandidatesFromRIS(entries, candidateStart)
+		return parsedFile{
+			kind:       kind,
+			parser:     "ris",
+			text:       formatRISSummary(entries),
+			fields:     map[string]any{"entry_count": len(entries), "entries": entries},
+			candidates: candidates,
+		}, nil
 	case "pdf":
 		text, err := extractPDFText(data)
 		if err != nil {
@@ -225,7 +238,14 @@ func parseMaterial(path string, candidateStart int) (parsedFile, error) {
 		if err != nil {
 			return parsedFile{kind: kind, parser: "csv_basic", degraded: true}, err
 		}
-		return parsedFile{kind: kind, parser: "csv_basic", degraded: true, text: text, fields: fields}, nil
+		candidates, err := references.CandidatesFromCSV(strings.NewReader(string(data)), candidateStart)
+		if err != nil {
+			return parsedFile{kind: kind, parser: "csv_basic", degraded: true}, err
+		}
+		if len(candidates) > 0 {
+			fields["reference_count"] = len(candidates)
+		}
+		return parsedFile{kind: kind, parser: "csv_basic", degraded: true, text: text, fields: fields, candidates: candidates}, nil
 	default:
 		return parsedFile{kind: kind}, errUnsupportedFormat
 	}
@@ -247,6 +267,8 @@ func kindFromPath(path string) string {
 		return "txt"
 	case ".bib", ".bibtex":
 		return "bibtex"
+	case ".ris":
+		return "ris"
 	case ".pdf":
 		return "pdf"
 	case ".docx":
@@ -262,7 +284,7 @@ func kindFromPath(path string) string {
 
 func parserForKind(kind string) string {
 	switch kind {
-	case "markdown", "txt", "bibtex":
+	case "markdown", "txt", "bibtex", "ris":
 		return kind
 	case "pdf":
 		return "pdf_text"

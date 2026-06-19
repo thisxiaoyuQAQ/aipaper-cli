@@ -307,6 +307,149 @@ func TestPubMedProviderParsesESearchAndESummary(t *testing.T) {
 	}
 }
 
+func TestOpenAlexProviderParsesResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, map[string]any{"results": []map[string]any{{
+			"id":               "https://openalex.org/W123",
+			"display_name":     "OpenAlex Paper",
+			"publication_year": 2024,
+			"doi":              "https://doi.org/10.1000/openalex",
+			"cited_by_count":   7,
+			"abstract_inverted_index": map[string]any{
+				"This": []int{0}, "abstract": []int{2}, "is": []int{1},
+			},
+			"authorships": []map[string]any{{"author": map[string]any{"display_name": "Ada"}}},
+			"primary_location": map[string]any{
+				"landing_page_url": "https://example.org/openalex",
+				"source":           map[string]any{"display_name": "Journal"},
+			},
+			"open_access": map[string]any{"is_oa": true, "oa_url": "https://example.org/fulltext"},
+		}}})
+	}))
+	defer server.Close()
+
+	provider := NewOpenAlexProvider(HTTPProviderConfig{BaseURL: server.URL, Client: server.Client()})
+	candidates, err := provider.Search(context.Background(), Query{Text: "rag", Limit: 1})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := candidates[0]; got.Source != OpenAlexProviderName || got.Title != "OpenAlex Paper" || got.Abstract != "This is abstract" || got.Availability != "open_access" || got.AccessURL != "https://example.org/fulltext" {
+		t.Fatalf("candidate = %#v", got)
+	}
+}
+
+func TestDOAJProviderParsesResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, map[string]any{"results": []map[string]any{{
+			"id": "doaj-1",
+			"bibjson": map[string]any{
+				"title":      "DOAJ Paper",
+				"abstract":   "<p>OA abstract</p>",
+				"year":       "2023",
+				"author":     []map[string]any{{"name": "Grace"}},
+				"identifier": []map[string]any{{"type": "doi", "id": "10.1000/doaj"}},
+				"link":       []map[string]any{{"type": "fulltext", "url": "https://example.org/doaj-full"}},
+				"journal":    map[string]any{"title": "OA Journal"},
+			},
+		}}})
+	}))
+	defer server.Close()
+
+	provider := NewDOAJProvider(HTTPProviderConfig{BaseURL: server.URL, Client: server.Client()})
+	candidates, err := provider.Search(context.Background(), Query{Text: "rag", Limit: 1})
+	if err != nil {
+		t.Fatalf("Search() error = %v", err)
+	}
+	if got := candidates[0]; got.Source != DOAJProviderName || got.Title != "DOAJ Paper" || got.Year != 2023 || got.Availability != "open_access" || got.DOI != "10.1000/doaj" {
+		t.Fatalf("candidate = %#v", got)
+	}
+}
+
+func TestDefaultProvidersIncludesOpenAlexAndDOAJ(t *testing.T) {
+	providers := DefaultProviders(HTTPProviderConfig{})
+	var names []string
+	for _, provider := range providers {
+		names = append(names, provider.Name())
+	}
+	joined := strings.Join(names, ",")
+	for _, want := range []string{OpenAlexProviderName, DOAJProviderName} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("providers = %#v, missing %s", names, want)
+		}
+	}
+}
+
+func TestRunSkipsRateLimitedProviderDuringExpansion(t *testing.T) {
+	s := store.NewAt(filepath.Join(t.TempDir(), "store"))
+	req := contracts.Requirements{
+		Topic:             "domestic literature search",
+		AllowOnlineSearch: true,
+	}
+
+	limitedCalls := 0
+	fallbackCalls := 0
+	providers := []Provider{
+		providerFunc{name: "semantic_scholar", fn: func(context.Context, Query) ([]contracts.ReferenceCandidate, error) {
+			limitedCalls++
+			return nil, ProviderError{Code: CodeSearchRateLimited, Source: "semantic_scholar", Message: "rate limited", Retryable: true}
+		}},
+		providerFunc{name: "openalex", fn: func(context.Context, Query) ([]contracts.ReferenceCandidate, error) {
+			fallbackCalls++
+			if fallbackCalls == 1 {
+				return []contracts.ReferenceCandidate{{Title: "Initial", Authors: []string{"A"}, Source: "openalex"}}, nil
+			}
+			return []contracts.ReferenceCandidate{{Title: "Expanded", Authors: []string{"B"}, Source: "openalex"}}, nil
+		}},
+	}
+
+	result, err := Run(context.Background(), s, Options{
+		Requirements:      req,
+		Providers:         providers,
+		Limit:             1,
+		ExpansionEnabled:  true,
+		MinCandidateCount: 2,
+		ExpansionLimit:    1,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if limitedCalls != 1 {
+		t.Fatalf("rate-limited provider calls = %d, want 1", limitedCalls)
+	}
+	if fallbackCalls != 2 {
+		t.Fatalf("fallback provider calls = %d, want 2", fallbackCalls)
+	}
+	if len(result.Errors) != 1 || result.Errors[0].Code != CodeSearchRateLimited {
+		t.Fatalf("errors = %#v", result.Errors)
+	}
+	if len(result.Candidates.Items) != 2 {
+		t.Fatalf("candidates = %#v", result.Candidates.Items)
+	}
+}
+
+func TestRunDeduplicatesRepeatedProviderErrors(t *testing.T) {
+	s := store.NewAt(filepath.Join(t.TempDir(), "store"))
+	req := contracts.Requirements{Topic: "empty", AllowOnlineSearch: true}
+	provider := providerFunc{name: "semantic_scholar", fn: func(context.Context, Query) ([]contracts.ReferenceCandidate, error) {
+		return nil, ProviderError{Code: CodeSearchRateLimited, Source: "semantic_scholar", Message: "rate limited", Retryable: true}
+	}}
+
+	result, err := Run(context.Background(), s, Options{
+		Requirements:      req,
+		Providers:         []Provider{provider},
+		Limit:             1,
+		ExpansionEnabled:  true,
+		MinCandidateCount: 2,
+		ExpansionLimit:    2,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if len(result.Errors) != 1 {
+		t.Fatalf("errors = %#v", result.Errors)
+	}
+}
+
 func writeJSON(t *testing.T, w http.ResponseWriter, value any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")

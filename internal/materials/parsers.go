@@ -35,6 +35,29 @@ func formatBibTeXSummary(entries []references.BibTeXEntry) string {
 	return b.String()
 }
 
+func formatRISSummary(entries []references.RISEntry) string {
+	var b strings.Builder
+	b.WriteString("# RIS References\n\n")
+	for _, entry := range entries {
+		title := "RIS reference"
+		for _, tag := range []string{"TI", "T1", "CT", "BT"} {
+			if values := entry.Fields[tag]; len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+				title = strings.TrimSpace(values[0])
+				break
+			}
+		}
+		fmt.Fprintf(&b, "- %s", title)
+		if values := entry.Fields["PY"]; len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+			fmt.Fprintf(&b, " (%s)", strings.TrimSpace(values[0]))
+		}
+		if values := entry.Fields["AU"]; len(values) > 0 && strings.TrimSpace(values[0]) != "" {
+			fmt.Fprintf(&b, " - %s", strings.TrimSpace(values[0]))
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 func parseCSVMaterial(data []byte) (string, map[string]any, error) {
 	reader := csv.NewReader(bytes.NewReader(data))
 	reader.FieldsPerRecord = -1

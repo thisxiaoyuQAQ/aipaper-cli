@@ -77,6 +77,9 @@ func (p CrossrefProvider) Search(ctx context.Context, query Query) ([]contracts.
 			Abstract:      cleanAbstract(item.Abstract),
 			Venue:         firstString(item.ContainerTitle),
 			CitationCount: item.IsReferencedByCount,
+			Reliability:   "crossref_metadata",
+			Availability:  candidateAvailability(item.URL, item.DOI),
+			AccessURL:     item.URL,
 		}
 		if err := validateCandidate(candidate); err != nil {
 			return nil, ProviderError{Code: CodeSearchFieldMissing, Source: p.Name(), Message: err.Error(), Retryable: false}

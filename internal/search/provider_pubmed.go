@@ -71,6 +71,10 @@ func (p PubMedProvider) Search(ctx context.Context, query Query) ([]contracts.Re
 			URL:           "https://pubmed.ncbi.nlm.nih.gov/" + uid + "/",
 			Venue:         item.FullJournalName,
 			CitationCount: 0,
+			Reliability:   "official_api",
+			Availability:  "landing_page",
+			AccessURL:     "https://pubmed.ncbi.nlm.nih.gov/" + uid + "/",
+			SourceID:      uid,
 		}
 		if err := validateCandidate(candidate); err != nil {
 			return nil, ProviderError{Code: CodeSearchFieldMissing, Source: p.Name(), Message: err.Error(), Retryable: false}

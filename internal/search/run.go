@@ -43,12 +43,14 @@ func Run(ctx context.Context, s store.Store, opts Options) (Result, error) {
 	}
 
 	var all []contracts.ReferenceCandidate
+	rateLimitedProviders := map[string]bool{}
 	for _, provider := range providers {
 		candidates, providerErrors := searchProvider(ctx, provider, query, "")
 		all = append(all, candidates...)
-		result.Errors = append(result.Errors, providerErrors...)
+		result.Errors = appendUniqueProviderErrors(result.Errors, providerErrors)
+		markRateLimitedProviders(rateLimitedProviders, providerErrors)
 	}
-	all, result.Errors = expandCandidates(ctx, all, query, providers, opts, result.Errors)
+	all, result.Errors = expandCandidates(ctx, all, query, providers, opts, result.Errors, rateLimitedProviders)
 
 	deduped := references.DedupeCandidates(all)
 	result.Candidates.Items = references.AssignCandidateIDs(deduped, 1)
@@ -96,7 +98,7 @@ func searchProvider(ctx context.Context, provider Provider, query Query, expansi
 	return out, errors
 }
 
-func expandCandidates(ctx context.Context, current []contracts.ReferenceCandidate, base Query, providers []Provider, opts Options, errors []ProviderError) ([]contracts.ReferenceCandidate, []ProviderError) {
+func expandCandidates(ctx context.Context, current []contracts.ReferenceCandidate, base Query, providers []Provider, opts Options, errors []ProviderError, rateLimitedProviders map[string]bool) ([]contracts.ReferenceCandidate, []ProviderError) {
 	if !opts.ExpansionEnabled {
 		return current, errors
 	}
@@ -117,8 +119,12 @@ func expandCandidates(ctx context.Context, current []contracts.ReferenceCandidat
 	queries := ExpansionQueriesFromRequirements(opts.Requirements, base, expansionLimit)
 	for _, expansionQuery := range queries {
 		for _, provider := range providers {
+			if rateLimitedProviders[strings.ToLower(provider.Name())] {
+				continue
+			}
 			candidates, providerErrors := searchProvider(ctx, provider, expansionQuery, expansionQuery.Text)
-			errors = append(errors, providerErrors...)
+			errors = appendUniqueProviderErrors(errors, providerErrors)
+			markRateLimitedProviders(rateLimitedProviders, providerErrors)
 			current = append(current, candidates...)
 			if len(references.DedupeCandidates(current)) >= minCandidates {
 				return current, errors
@@ -126,6 +132,38 @@ func expandCandidates(ctx context.Context, current []contracts.ReferenceCandidat
 		}
 	}
 	return current, errors
+}
+
+func appendUniqueProviderErrors(existing []ProviderError, additions []ProviderError) []ProviderError {
+	for _, err := range additions {
+		key := providerErrorKey(err)
+		duplicate := false
+		for _, current := range existing {
+			if providerErrorKey(current) == key {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			existing = append(existing, err)
+		}
+	}
+	return existing
+}
+
+func providerErrorKey(err ProviderError) string {
+	return strings.ToLower(strings.TrimSpace(err.Source)) + "\x00" + strings.TrimSpace(err.Code) + "\x00" + strings.TrimSpace(err.Message)
+}
+
+func markRateLimitedProviders(skip map[string]bool, errors []ProviderError) {
+	if skip == nil {
+		return
+	}
+	for _, err := range errors {
+		if err.Code == CodeSearchRateLimited && strings.TrimSpace(err.Source) != "" {
+			skip[strings.ToLower(strings.TrimSpace(err.Source))] = true
+		}
+	}
 }
 
 func writeResult(s store.Store, result Result) (Result, error) {

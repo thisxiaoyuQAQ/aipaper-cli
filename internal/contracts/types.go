@@ -81,6 +81,10 @@ type ReferenceCandidate struct {
 	Abstract        string   `json:"abstract,omitempty"`
 	Venue           string   `json:"venue,omitempty"`
 	CitationCount   int      `json:"citation_count,omitempty"`
+	Reliability     string   `json:"reliability,omitempty"`
+	Availability    string   `json:"availability,omitempty"`
+	AccessURL       string   `json:"access_url,omitempty"`
+	SourceID        string   `json:"source_id,omitempty"`
 	RelevanceScore  float64  `json:"relevance_score,omitempty"`
 	RelevanceReason string   `json:"relevance_reason,omitempty"`
 	ExpansionSource string   `json:"expansion_source,omitempty"`
@@ -101,6 +105,10 @@ type ConfirmedReference struct {
 	URL               string    `json:"url,omitempty"`
 	Abstract          string    `json:"abstract,omitempty"`
 	Venue             string    `json:"venue,omitempty"`
+	Reliability       string    `json:"reliability,omitempty"`
+	Availability      string    `json:"availability,omitempty"`
+	AccessURL         string    `json:"access_url,omitempty"`
+	SourceID          string    `json:"source_id,omitempty"`
 	SourceMaterialIDs []string  `json:"source_material_ids"`
 	ConfirmedAt       time.Time `json:"confirmed_at"`
 }

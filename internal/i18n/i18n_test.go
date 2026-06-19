@@ -33,8 +33,14 @@ func TestTranslatorFallbackAndFormat(t *testing.T) {
 	if got := tr.Text(Key("missing.key")); got != "missing.key" {
 		t.Fatalf("missing key = %q", got)
 	}
-	if got := New("zh-CN").Format(SearchMaterialCandidates, 3); got != "材料候选：3" {
+	if got := New("zh-CN").Format(SearchMaterialCandidates, 3); got != "本地引用候选：3" {
 		t.Fatalf("Format() = %q", got)
+	}
+	if got := New("zh-CN").Text(ReferencesSummary); got != "概要" {
+		t.Fatalf("Text(zh ReferencesSummary) = %q", got)
+	}
+	if got := tr.Text(ReferencesSummary); got != "Summary" {
+		t.Fatalf("Text(en ReferencesSummary) = %q", got)
 	}
 }
 

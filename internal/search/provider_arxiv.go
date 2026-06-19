@@ -44,14 +44,17 @@ func (p ArxivProvider) Search(ctx context.Context, query Query) ([]contracts.Ref
 	candidates := make([]contracts.ReferenceCandidate, 0, len(feed.Entries))
 	for _, entry := range feed.Entries {
 		candidate := contracts.ReferenceCandidate{
-			Title:    cleanXMLText(entry.Title),
-			Authors:  entry.AuthorNames(),
-			Year:     yearFromString(entry.Published),
-			Source:   p.Name(),
-			DOI:      entry.DOI,
-			URL:      entry.URL(),
-			Abstract: cleanXMLText(entry.Summary),
-			Venue:    "arXiv",
+			Title:        cleanXMLText(entry.Title),
+			Authors:      entry.AuthorNames(),
+			Year:         yearFromString(entry.Published),
+			Source:       p.Name(),
+			DOI:          entry.DOI,
+			URL:          entry.URL(),
+			Abstract:     cleanXMLText(entry.Summary),
+			Venue:        "arXiv",
+			Reliability:  "repository",
+			Availability: "open_access",
+			AccessURL:    entry.URL(),
 		}
 		if err := validateCandidate(candidate); err != nil {
 			return nil, ProviderError{Code: CodeSearchFieldMissing, Source: p.Name(), Message: err.Error(), Retryable: false}

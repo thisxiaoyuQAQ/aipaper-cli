@@ -45,18 +45,22 @@ type Provider interface {
 
 ### 内置免费公开源（始终可用）
 
-- `semantic_scholar`（Semantic Scholar）
+- `openalex`（OpenAlex，官方公开 API，含开放获取与中文文献元数据）
 - `crossref`（Crossref）
+- `semantic_scholar`（Semantic Scholar，可能限流，限流时跳过本次扩展搜索并继续其他来源）
 - `arxiv`（arXiv）
 - `pubmed`（PubMed）
+- `doaj`（DOAJ，开放获取期刊文章）
 
 当前 provider 构造器：
 
 ```go
-NewSemanticScholarProvider(search.HTTPProviderConfig)
+NewOpenAlexProvider(search.HTTPProviderConfig)
 NewCrossrefProvider(search.HTTPProviderConfig)
+NewSemanticScholarProvider(search.HTTPProviderConfig)
 NewArxivProvider(search.HTTPProviderConfig)
 NewPubMedProvider(search.HTTPProviderConfig)
+NewDOAJProvider(search.HTTPProviderConfig)
 DefaultProviders(search.HTTPProviderConfig)
 ```
 
@@ -64,10 +68,12 @@ DefaultProviders(search.HTTPProviderConfig)
 
 | Provider | Endpoint |
 | --- | --- |
-| `semantic_scholar` | `https://api.semanticscholar.org/graph/v1/paper/search` |
+| `openalex` | `https://api.openalex.org/works` |
 | `crossref` | `https://api.crossref.org/works` |
+| `semantic_scholar` | `https://api.semanticscholar.org/graph/v1/paper/search` |
 | `arxiv` | `https://export.arxiv.org/api/query` |
 | `pubmed` | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi` + `esummary.fcgi` |
+| `doaj` | `https://doaj.org/api/search/articles/<query>` |
 
 ### 可选增强源（通过 `search_providers` 配置启用）
 
@@ -78,6 +84,10 @@ DefaultProviders(search.HTTPProviderConfig)
 - 其他自定义搜索 provider
 
 > 增强源稳定性不保证（spec 第 8 节边界：不承诺 Google Scholar 原生稳定抓取）。
+
+### 国内数据库接入
+
+知网、万方、维普等国内数据库通常没有稳定的公开通用检索 API，且部分内容需要机构订阅。程序不实现绕过登录、验证码、反爬或付费墙的抓取。可靠接入方式是从这些数据库使用官方导出功能导出 BibTeX/RIS/CSV/EndNote 类文献文件，放入材料目录；材料扫描会把 BibTeX、RIS 和带有 `题名/标题/title`、`作者/authors`、`年份/year`、`来源/期刊/journal`、`DOI`、`链接/URL`、`摘要/abstract` 等列的 CSV 转为本地引用候选。
 
 ## 3. 标准化字段
 
@@ -94,6 +104,10 @@ DefaultProviders(search.HTTPProviderConfig)
 | venue | `venue` | 期刊/会议（`omitempty`） |
 | source | `source` | 来源标识，如 `semantic_scholar` |
 | citation_count | `citation_count` | 被引数（如有，`omitempty`） |
+| reliability | `reliability` | 来源可靠性，如 `official_api`、`repository`、`crossref_metadata`、`user_export`（`omitempty`） |
+| availability | `availability` | 可获取性，如 `open_access`、`landing_page`、`doi_landing`、`unknown`（`omitempty`） |
+| access_url | `access_url` | 优先访问链接（`omitempty`） |
+| source_id | `source_id` | 来源系统 ID（`omitempty`） |
 | relevance_score | `relevance_score` | 相关性评分（`omitempty`） |
 | dedupe_group | `dedupe_group` | 去重分组键（`omitempty`） |
 | status | `status` | 候选状态，初始 `pending` |

@@ -112,18 +112,21 @@ func TestWriteCandidates_EmptyList(t *testing.T) {
 func TestFormatCandidatesMarkdown_AllFields(t *testing.T) {
 	candidates := []contracts.ReferenceCandidate{
 		{
-			ID:             "cand_001",
-			Title:          "Complete Paper",
-			Authors:        []string{"Author A"},
-			Year:           2023,
-			Source:         "test",
-			DOI:            "10.1234/test",
-			URL:            "https://example.com",
-			Abstract:       "This is an abstract.",
-			Venue:          "Conference 2023",
-			CitationCount:  42,
-			DedupeGroup:    "doi:10.1234/test",
-			Status:         "pending",
+			ID:            "cand_001",
+			Title:         "Complete Paper",
+			Authors:       []string{"Author A"},
+			Year:          2023,
+			Source:        "test",
+			DOI:           "10.1234/test",
+			URL:           "https://example.com",
+			Abstract:      "This is an abstract.",
+			Venue:         "Conference 2023",
+			CitationCount: 42,
+			Reliability:   "official_api",
+			Availability:  "open_access",
+			AccessURL:     "https://example.com/fulltext",
+			DedupeGroup:   "doi:10.1234/test",
+			Status:        "pending",
 		},
 	}
 
@@ -138,10 +141,13 @@ func TestFormatCandidatesMarkdown_AllFields(t *testing.T) {
 		"- Source: test",
 		"- DOI: 10.1234/test",
 		"- URL: https://example.com",
+		"- 可获取性：开放获取",
+		"- 可靠性：官方公开接口",
+		"- 优先访问链接：https://example.com/fulltext",
+		"- 概要：This is an abstract.",
 		"- Venue: Conference 2023",
 		"- Citation count: 42",
 		"- Dedupe group: doi:10.1234/test",
-		"This is an abstract.",
 	}
 
 	for _, expected := range expectations {
@@ -175,6 +181,43 @@ func TestFormatCandidatesMarkdown_MinimalFields(t *testing.T) {
 	}
 	if strings.Contains(md, "DOI:") {
 		t.Error("markdown should not contain DOI when empty")
+	}
+	if strings.Contains(md, "- 概要：") {
+		t.Error("markdown should not contain summary when abstract is empty")
+	}
+}
+
+func TestCandidateSummaryFormatsAbstract(t *testing.T) {
+	if got := CandidateSummary("  第一句。\n\t第二句。   第三句。 "); got != "第一句。 第二句。 第三句。" {
+		t.Fatalf("CandidateSummary normalized = %q", got)
+	}
+	if got := CandidateSummary(" \n\t "); got != "" {
+		t.Fatalf("CandidateSummary blank = %q", got)
+	}
+	long := strings.Repeat("中", CandidateSummaryMaxRunes+1)
+	got := CandidateSummary(long)
+	want := strings.Repeat("中", CandidateSummaryMaxRunes) + "..."
+	if got != want {
+		t.Fatalf("CandidateSummary long = %q, want %q", got, want)
+	}
+}
+
+func TestFormatCandidatesMarkdown_SummaryNormalizesAndOmitsBlank(t *testing.T) {
+	candidates := []contracts.ReferenceCandidate{
+		{ID: "cand_001", Title: "With Abstract", Source: "test", Abstract: "  one\n two\t\tthree  ", Status: "pending"},
+		{ID: "cand_002", Title: "Blank Abstract", Source: "test", Abstract: " \n\t ", Status: "pending"},
+	}
+
+	md := FormatCandidatesMarkdown(candidates)
+
+	if !strings.Contains(md, "- 概要：one two three") {
+		t.Fatalf("markdown should contain normalized summary:\n%s", md)
+	}
+	if strings.Contains(md, "one\n two") {
+		t.Fatalf("markdown should not contain raw multiline abstract:\n%s", md)
+	}
+	if strings.Count(md, "- 概要：") != 1 {
+		t.Fatalf("markdown should contain exactly one summary line:\n%s", md)
 	}
 }
 

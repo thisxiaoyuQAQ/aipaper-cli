@@ -18,6 +18,7 @@ import (
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/artifacts"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
+	finalexport "github.com/thisxiaoyuQAQ/aipaper-cli/internal/export"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/materials"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
@@ -444,5 +445,138 @@ func TestQualityMiniGateHardBlocksEveryMode(t *testing.T) {
 				t.Fatalf("mode %s missing blocker %s: %#v", mode, code, outcome.Blockers)
 			}
 		}
+	}
+}
+
+// TestPaperQualityRuntimeGateNotDegradedByPolicy is the task-45 non-regression
+// acceptance: with the PaperQualityPolicy now injected into the runtime, the
+// gate's hard-block bottom line and the three-mode graded matrix must behave
+// exactly as before the policy landed. A graph carrying all four hard-block
+// violations is blocked in fast/enhanced/strict, and the policy version is the
+// stable constant the report surface depends on.
+func TestPaperQualityRuntimeGateNotDegradedByPolicy(t *testing.T) {
+	if quality.PaperQualityPolicyVersion == "" {
+		t.Fatal("PaperQualityPolicyVersion must be a non-empty stable constant")
+	}
+	policy := quality.DefaultPaperQualityPolicy()
+	if policy.Version != quality.PaperQualityPolicyVersion || len(policy.CoordinatorSections) == 0 {
+		t.Fatalf("DefaultPaperQualityPolicy() = %#v", policy)
+	}
+
+	// Reuse the same hard-block input as TestQualityMiniGateHardBlocksEveryMode;
+	// the policy helper never participates in gating, so the outcome must be
+	// unchanged: every mode blocks on all four bottom-line violations.
+	input := quality.GateInput{
+		Graph: quality.ClaimGraph{
+			UpdatedAt: fixedTime(),
+			Claims: []quality.ClaimNode{
+				{ID: "claim_001", Text: "cites a forged key", ChapterID: "ch01",
+					ReferenceKeys: []string{"ghost2099fabricated"}, EvidenceIDs: []string{"ev_001"},
+					Support: quality.SupportSupported},
+				{ID: "claim_002", Text: "has no evidence binding", ChapterID: "ch01",
+					ReferenceKeys: []string{"chen2024cbti"},
+					Support:       quality.SupportSupported},
+				{ID: "claim_003", Text: "binds unknown evidence", ChapterID: "ch02",
+					ReferenceKeys: []string{"chen2024cbti"}, EvidenceIDs: []string{"ev_999"},
+					Support:       quality.SupportSupported},
+			},
+		},
+		ConfirmedKeys: map[string]bool{"chen2024cbti": true},
+		EvidenceByID: map[string]quality.Evidence{
+			"ev_001": {ID: "ev_001", ReferenceKey: "chen2024cbti", Depth: quality.DepthAbstract, Confidence: "medium"},
+		},
+	}
+	for _, mode := range []string{quality.ModeFast, quality.ModeEnhanced, quality.ModeStrict} {
+		input.Mode = mode
+		outcome := quality.EvaluateQualityGate(input)
+		if outcome.Conclusion != quality.GateBlocked {
+			t.Fatalf("policy-on mode %s conclusion = %s, want blocked (hard block must not regress)", mode, outcome.Conclusion)
+		}
+	}
+}
+
+// TestPaperQualityRuntimeReportSurfacesPolicyAndActions is the task-45 export
+// acceptance: a clean enhanced flow (no unsupported claim) still renders the
+// policy version and a Human Action Items section, and a flow with an
+// unsupported claim surfaces a concrete action item referencing that claim.
+func TestPaperQualityRuntimeReportSurfacesPolicyAndActions(t *testing.T) {
+	setup := setupQualityMini(t)
+	s := setup.store
+
+	ch01 := qualityDraftBundle("ch01", []contracts.Claim{{
+		ID:            "ch01_claim_001",
+		Text:          qmAbsoluteClaim,
+		Importance:    "high",
+		ReferenceKeys: []string{setup.chenKey},
+		EvidenceIDs:   []string{"ev_001"},
+	}}, []string{setup.chenKey})
+	if _, err := agent.WriteGuardedDraftBundle(s, ch01); err != nil {
+		t.Fatalf("WriteGuardedDraftBundle(ch01) error = %v", err)
+	}
+	ch02 := qualityDraftBundle("ch02", []contracts.Claim{{
+		ID:            "ch02_claim_001",
+		Text:          qmUnsupportedClaim,
+		Importance:    "medium",
+		ReferenceKeys: []string{setup.garciaKey},
+		EvidenceIDs:   []string{"ev_002"},
+	}}, []string{setup.garciaKey})
+	if _, err := agent.WriteGuardedDraftBundle(s, ch02); err != nil {
+		t.Fatalf("WriteGuardedDraftBundle(ch02) error = %v", err)
+	}
+
+	if _, _, err := quality.ExtractChapterClaimGraph(s, "ch01", 1, false, fixedTime()); err != nil {
+		t.Fatalf("ExtractChapterClaimGraph(ch01) error = %v", err)
+	}
+	graph, _, err := quality.ExtractChapterClaimGraph(s, "ch02", 1, false, fixedTime())
+	if err != nil {
+		t.Fatalf("ExtractChapterClaimGraph(ch02) error = %v", err)
+	}
+	verdicts := []quality.ClaimVerdict{
+		{ClaimID: "claim_001", Support: quality.SupportSupported, RiskLevel: quality.RiskHigh,
+			VerifierNote: "absolute conclusion on abstract-level evidence"},
+	}
+	var unsupportedID string
+	for _, node := range graph.Claims {
+		if node.ChapterID == "ch02" {
+			verdicts = append(verdicts, quality.ClaimVerdict{
+				ClaimID: node.ID, Support: quality.SupportUnsupported, RiskLevel: quality.RiskMedium,
+				VerifierNote: "evidence does not cover shift workers",
+			})
+			unsupportedID = node.ID
+		}
+	}
+	if unsupportedID == "" {
+		t.Fatalf("unsupported claim node not found")
+	}
+	if _, _, _, err := quality.SaveVerificationResult(s, verdicts, fixedTime()); err != nil {
+		t.Fatalf("SaveVerificationResult() error = %v", err)
+	}
+
+	// Accept both chapters so the export path runs.
+	for _, chapterID := range []string{"ch01", "ch02"} {
+		review := mockReview(chapterID, 1, true, 86, 94)
+		if _, err := artifacts.WriteReview(s, review, "accepted in mock flow"); err != nil {
+			t.Fatalf("WriteReview(%s) error = %v", chapterID, err)
+		}
+		if _, err := artifacts.CommitAccepted(s, chapterID, 1, review); err != nil {
+			t.Fatalf("CommitAccepted(%s) error = %v", chapterID, err)
+		}
+	}
+	input, err := finalexport.LoadInput(s)
+	if err != nil {
+		t.Fatalf("LoadInput() error = %v", err)
+	}
+	if _, err := finalexport.ExportFinal(s, input, finalexport.Options{Now: fixedTime()}); err != nil {
+		t.Fatalf("ExportFinal() error = %v", err)
+	}
+	report := readStoreText(t, s, "final/quality-report.md")
+	if !strings.Contains(report, "Paper Quality policy: `"+quality.PaperQualityPolicyVersion+"`") {
+		t.Fatalf("quality-report.md missing Paper Quality policy version:\n%s", report)
+	}
+	if !strings.Contains(report, "## Human Action Items") {
+		t.Fatalf("quality-report.md missing Human Action Items section:\n%s", report)
+	}
+	if !strings.Contains(report, unsupportedID) {
+		t.Fatalf("quality-report.md should surface an action item for unsupported claim %s:\n%s", unsupportedID, report)
 	}
 }

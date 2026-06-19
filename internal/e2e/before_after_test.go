@@ -220,6 +220,19 @@ func TestE2EBeforeAfterStructuralComparison(t *testing.T) {
 			t.Fatalf("quality-report.md missing %q:\n%s", want, qualityReport)
 		}
 	}
+	// Task 45: the runtime Paper Quality policy is reflected end-to-end in the
+	// exported report. The policy version and the deterministic Human Action
+	// Items section (driven by the unsupported claim) must both be present.
+	if !strings.Contains(qualityReport, "Paper Quality policy: `"+quality.PaperQualityPolicyVersion+"`") {
+		t.Fatalf("quality-report.md missing Paper Quality policy version:\n%s", qualityReport)
+	}
+	if !strings.Contains(qualityReport, "## Human Action Items") {
+		t.Fatalf("quality-report.md missing Human Action Items section:\n%s", qualityReport)
+	}
+	unsupportedNodeID := unsupportedClaimID(t, es)
+	if unsupportedNodeID != "" && !strings.Contains(qualityReport, unsupportedNodeID) {
+		t.Fatalf("quality-report.md Human Action Items should reference unsupported claim %s:\n%s", unsupportedNodeID, qualityReport)
+	}
 	enhancedReport := readStoreText(t, es, "final/report.md")
 	if !strings.Contains(enhancedReport, "## Quality Summary") || strings.Contains(enhancedReport, "compatibility mode") {
 		t.Fatalf("enhanced report.md quality summary wrong:\n%s", enhancedReport)
@@ -254,4 +267,21 @@ func hasIssue(issues []finalexport.Issue, code string) bool {
 		}
 	}
 	return false
+}
+
+// unsupportedClaimID loads the claim graph and returns the runtime id of the
+// node carrying the unsupported shift-workers claim, so the end-to-end report
+// assertion can reference the exact id rendered in the Human Action Items.
+func unsupportedClaimID(t *testing.T, s store.Store) string {
+	t.Helper()
+	graph, err := quality.LoadClaimGraph(s)
+	if err != nil {
+		t.Fatalf("LoadClaimGraph() error = %v", err)
+	}
+	for _, node := range graph.Claims {
+		if node.Text == qmUnsupportedClaim {
+			return node.ID
+		}
+	}
+	return ""
 }

@@ -4,6 +4,8 @@
 
 代码入口仍位于 `cmd/aipaper-cli`，默认配置文件仍为 `aipaper.json`，默认输出目录仍为 `output/aipaper/`。
 
+**语言 / Languages：** [English](README.en.md) | 中文（当前）
+
 ## 核心特性
 
 ### 交互式工作流
@@ -416,6 +418,7 @@ DOCX 使用基础导出器。导出失败时，`final/paper.md`、`final/referen
 ## 文档索引
 
 - [用户指南（详细版）](docs/user-guide.md)：完整安装、配置、材料准备、生成、导出、恢复说明。
+- [User Guide (English)](docs/user-guide.en.md)：full install, configuration, material prep, generation, export, and recovery notes.
 - [需求与架构](docs/需求与架构.md)：设计背景、技术选型、模块设计。
 - [接口契约索引](docs/interfaces/_index.md)：JSON Schema 与契约定义。
 - [Paper Quality Skill 运行时设计](docs/superpowers/specs/2026-06-20-paper-quality-skill-runtime-design.md)：质量策略本地化注入与质量引擎设计。

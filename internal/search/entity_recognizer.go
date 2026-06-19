@@ -2,6 +2,7 @@ package search
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -61,6 +62,13 @@ func RecognizeEntities(text string, language string) []Entity {
 
 	// 3. Person names
 	entities = append(entities, recognizePersons(text)...)
+
+	sort.SliceStable(entities, func(i, j int) bool {
+		if entities[i].Start != entities[j].Start {
+			return entities[i].Start < entities[j].Start
+		}
+		return entities[i].End < entities[j].End
+	})
 
 	return entities
 }

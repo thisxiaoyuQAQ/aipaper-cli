@@ -16,8 +16,9 @@
 | [export.md](./export.md) | `final/` 交付产物契约与 `citation-trace.json` 字段 | `internal/export` |
 | [config.md](./config.md) | `Config` / `ProviderConfig` / `RoleConfig`、查找顺序与合并规则 | `internal/config/config.go` |
 | [agent.md](./agent.md) | Architect / Writer / Editor 输入输出契约、引用硬规则与质量门控阈值 | spec 第 3 节 + `internal/contracts/types.go` |
-| [tui.md](./tui.md) | TUI 增量屏幕状态机、ConfigWizard 模板、RuntimeEvent 与 UsageSnapshot 契约 | `internal/tui/app`、`internal/tui/configwizard`、`internal/tui/writing`（待实现） |
-| [quality.md](./quality.md) | Quality Engine 产物契约：EvidenceTable / SectionQualityPlan / ClaimGraph / quality_gate_check 与既有契约扩展 | `internal/quality`（模块 23-31 待实现） |
+| [tui.md](./tui.md) | TUI 增量屏幕状态机、ConfigWizard 模板、RuntimeEvent 与 UsageSnapshot 契约 | `internal/tui/app`、`internal/tui/configwizard`、`internal/tui/writing` |
+| [quality.md](./quality.md) | Quality Engine 产物契约：EvidenceTable / SectionQualityPlan / ClaimGraph / quality_gate_check 与既有契约扩展 | `internal/quality`、`internal/agent/*quality*.go`、`internal/export/quality_report.go` |
+| [paper_quality_skill.md](./paper_quality_skill.md) | Paper Quality Skill 运行时策略契约：本地 policy helper、角色 prompt scope、报告解释与兼容边界 | `internal/quality/paper_quality_policy.go` |
 
 ## 通用约定
 

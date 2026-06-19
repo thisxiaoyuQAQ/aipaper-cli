@@ -1,7 +1,19 @@
 # Quality Engine 质量产物契约
 
-> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）、25（Writer 证据使用协议）、26（ClaimGraph 写后抽取）、27（ClaimVerification 与质量门控）、28（EditorRewriteInstructions）已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/claimgraph.go`、`internal/quality/verification.go`、`internal/quality/gate.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`、`internal/quality/claimgraph_tools.go`、`internal/quality/verification_tools.go`、`internal/agent/writer_quality.go`、`internal/agent/claim_quality.go`、`internal/agent/verification_quality.go`、`internal/agent/editor_quality.go`、`internal/artifacts/claims.go`、`internal/artifacts/quality.go`、`internal/contracts/types.go`；模块 29-31 仍为规划产物。
+> 状态：模块 23（EvidenceTable）、24（SectionQualityPlan）、25（Writer 证据使用协议）、26（ClaimGraph 写后抽取）、27（ClaimVerification 与质量门控）、28（EditorRewriteInstructions）、29（QualityReport 导出汇总）、30（TUI 质量模式与恢复兼容）、31（三层验收与质量夹具）均已实现，权威来源为 `internal/quality/evidence.go`、`internal/quality/sectionplan.go`、`internal/quality/claimgraph.go`、`internal/quality/verification.go`、`internal/quality/gate.go`、`internal/quality/tools.go`、`internal/quality/sectionplan_tools.go`、`internal/quality/claimgraph_tools.go`、`internal/quality/verification_tools.go`、`internal/agent/writer_quality.go`、`internal/agent/claim_quality.go`、`internal/agent/verification_quality.go`、`internal/agent/editor_quality.go`、`internal/artifacts/claims.go`、`internal/artifacts/quality.go`、`internal/contracts/types.go`、`internal/export/quality_report.go`；模块 39-45 将在此基础上接入 Paper Quality Skill 运行时策略。
 > 设计依据：`docs/superpowers/specs/2026-06-10-quality-engine-design.md` 第 3、4、5 节。
+
+## 0. Paper Quality Skill 运行时策略（模块 39-45 规划）
+
+`docs/skills/paper-cli-paper-quality` 中的论文质量规则不会作为外部 skill 在运行时动态加载，而是本地化为 `internal/quality/paper_quality_policy.go` 中的稳定策略 helper。该策略复用现有质量产物，不新增首期必填字段：
+
+- Evidence depth 继续由 `Evidence.Depth` 表达；
+- 章节叙事、边界、禁用泛化和缺口继续由 `SectionPlan` 表达；
+- claim type 首期只作为 Verifier 内部判断或写入 `ClaimVerdict.VerifierNote`，不扩展 `ClaimVerdict` schema；
+- 审稿式修改继续落入 `Review.RewriteInstructions`；
+- 用户可见解释继续通过 `final/quality-report.md` deterministic 渲染。
+
+详见 [paper_quality_skill.md](./paper_quality_skill.md)。
 
 ## 1. 存储路径
 

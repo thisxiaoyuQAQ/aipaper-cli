@@ -24,6 +24,7 @@
 - 质量门控：单章总分 >= 80，引用一致性 >= 90，无高风险 unsupported claim；最多重写 2 轮
 - 质量模式：`requirements.json.quality_mode = fast | enhanced(默认) | strict`，三档只改门控严格度，产物结构相同；硬阻断（伪造 key、claim 无 evidence、引用未 confirmed）所有模式生效
 - 质量产物：`quality/evidence-table.json`、`quality/section-quality-plan.json`、`quality/claim-graph.json`，契约见 `docs/interfaces/quality.md`
+- Paper Quality Skill 运行时策略：`docs/skills/paper-cli-paper-quality` 只作为蒸馏来源，运行时必须使用本地化、可测试的 `PaperQualityPolicy`；不直接读取外部 skill 文档，不放宽 confirmed references / Writer Guard / Quality Gate
 - TUI 增量原则：TUI 编排屏幕，Host 执行运行时，Coordinator 决策写作流程，Store 是状态权威
 
 ## 模块依赖关系
@@ -54,6 +55,14 @@
                            └─ 29-QualityReport导出汇总（依赖 08）
                                 └─ 30-TUI质量模式与恢复兼容（依赖 10-22）
                                      └─ 31-三层验收与质量夹具（依赖 09）
+
+39-PaperQualitySkill运行时设计与接口
+  └─ 40-PaperQualityPolicy本地策略底座
+       ├─ 41-Coordinator与Architect质量策略注入
+       ├─ 42-Writer证据约束与风格策略注入
+       ├─ 43-Verifier与Editor审稿Rubric注入
+       └─ 44-QualityReport质量Skill摘要增强
+            └─ 45-运行时启用端到端验收
 ```
 
 ## 文档指针
@@ -72,8 +81,11 @@
 - Quality Engine 验收报告：`docs/QualityEngine验收报告.md`（三层验收证据与 before/after 对照；主观签字见 `agent-output/request/QualityEngine-before-after-确认请求.md`）
 - 修复记录：`docs/修复记录.md`（如不存在，首次修复时创建）
 - TUI 增量任务：`vault/10-*.md` 至 `vault/22-*.md`（已完成）
-- 当前 Bug 修复任务：`vault/BUG-20260613-01-真实Runtime编排接线.md`（方案 B 已确认，待修复；下一 session 从此文件进入）
+- 当前 Bug 修复任务：`vault/BUG-20260613-01-真实Runtime编排接线.md`（✅ 已修复并验收 2026-06-13；含环境注意事项：全局 `~/.aipaper/config.json` 会与项目配置合并，真实运行前确认角色 provider/BaseURL）
 - Quality Engine 任务：`vault/23-*.md` 至 `vault/31-*.md`（23-31 全部完成，31 用户已签字通过 2026-06-13）
+- Paper Quality Skill 运行时设计稿：`docs/superpowers/specs/2026-06-20-paper-quality-skill-runtime-design.md`
+- Paper Quality Skill 接口契约：`docs/interfaces/paper_quality_skill.md`
+- 当前 Paper Quality Skill 运行时任务：`vault/39-*.md` 至 `vault/45-*.md`（待开发）
 
 ## 勿动文件清单
 
@@ -121,6 +133,7 @@
 
 - 每个开发任务开始前必须读取本文件、对应 vault、`docs/TUI全流程增量需求.md`、`docs/TUI全流程增量架构设计.md`、`docs/interfaces/tui.md`
 - Quality Engine 任务（23-31）额外先读 `docs/superpowers/specs/2026-06-10-quality-engine-design.md`、`docs/interfaces/quality.md`；勿动目录只做边界扩展，不重写既有规则
+- Paper Quality Skill 运行时任务（39-45）额外先读 `docs/superpowers/specs/2026-06-20-paper-quality-skill-runtime-design.md`、`docs/interfaces/paper_quality_skill.md`、`docs/skills/paper-cli-paper-quality/SKILL.md`；运行时只接入本地化策略 helper，不直接读取 docs/skills，不扩首期 schema，不放宽既有质量硬规则
 - 调度顺序：编写 → 审查 → 测试 → 修复（最多 3 轮）→ 记录进度
 - 作者和审查必须分离；不要在同一主动上下文中自审通过
 - 代码实现优先复用 `internal/contracts`、`internal/store`、`internal/checkpoint`、`internal/config`

@@ -13,6 +13,8 @@ type Requirements struct {
     Scope              string   `json:"scope"`
     Language           string   `json:"language"`
     CitationStyle      string   `json:"citation_style"`
+    ArticleTemplate    string   `json:"article_template,omitempty"`
+    QualityMode        string   `json:"quality_mode,omitempty"`
     TargetWords        int      `json:"target_words"`
     MaterialDir        string   `json:"material_dir"`
     AllowOnlineSearch  bool     `json:"allow_online_search"`
@@ -31,6 +33,8 @@ type Requirements struct {
 | Scope | `scope` | string | 综述范围（时间/语种/领域） |
 | Language | `language` | string | 目标语言，`zh-CN` 或 `en` |
 | CitationStyle | `citation_style` | string | 引用格式，中文默认 `gbt7714`，英文默认 `apa` |
+| ArticleTemplate | `article_template` | string | 文章模板，当前支持中文课程论文 / 综述论文等模板；为空由运行时默认模板兜底（`omitempty`） |
+| QualityMode | `quality_mode` | string | 质量模式，`fast` / `enhanced` / `strict`；为空按 `enhanced` 处理（`omitempty`） |
 | TargetWords | `target_words` | int | 目标字数，> 0 |
 | MaterialDir | `material_dir` | string | 材料目录路径 |
 | AllowOnlineSearch | `allow_online_search` | bool | 是否允许联网学术搜索 |
@@ -52,6 +56,8 @@ type Requirements struct {
   "scope": "2020-2026 年英文与中文核心研究",
   "language": "zh-CN",
   "citation_style": "gbt7714",
+  "article_template": "zh_course_paper",
+  "quality_mode": "enhanced",
   "target_words": 8000,
   "material_dir": "./materials",
   "allow_online_search": true,
@@ -67,11 +73,13 @@ type Requirements struct {
 
 1. `topic` 非空。
 2. `language` ∈ {`zh-CN`, `en`}；若空，按配置 `default_language` 兜底。
-3. `citation_style` 合法；为空时按语言推断（zh→`gbt7714`，en→`apa`）。
-4. `target_words` > 0。
-5. `material_dir` 非空且目录可访问（材料目录不存在归类为材料错误）。
-6. 当 `allow_online_search=false` 时，`search_providers` 应被忽略；当为 `true` 且指定增强源时，源名须在支持列表内（见 [search.md](./search.md)）。
-7. `research_questions` 建议非空，便于 Coordinator 生成搜索查询；为空不阻塞但会降低搜索召回。
+3. `citation_style` 合法；为空时按语言或文章模板推断（zh→`gbt7714`，en→`apa`）。
+4. `article_template` 为空时按运行时默认模板处理；非空时必须能被模板注册表解析。
+5. `quality_mode` ∈ {`fast`, `enhanced`, `strict`}；为空时按 `enhanced` 处理。
+6. `target_words` > 0。
+7. `material_dir` 非空且目录可访问（材料目录不存在归类为材料错误）。
+8. 当 `allow_online_search=false` 时，`search_providers` 应被忽略；当为 `true` 且指定增强源时，源名须在支持列表内（见 [search.md](./search.md)）。
+9. `research_questions` 建议非空，便于 Coordinator 生成搜索查询；为空不阻塞但会降低搜索召回。
 
 校验通过后写入 `requirements.json`，对应 checkpoint step `collect_requirements`。
 

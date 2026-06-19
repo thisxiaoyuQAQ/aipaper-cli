@@ -16,6 +16,7 @@ import (
 	"github.com/voocel/agentcore"
 
 	aipagent "github.com/thisxiaoyuQAQ/aipaper-cli/internal/agent"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/artifacts"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/checkpoint"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/config"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/contracts"
@@ -251,10 +252,12 @@ func TestWriterRunnerWritesGuardedBundleAndCheckpoint(t *testing.T) {
 	if kinds["content_delta"] == 0 || kinds["usage_update"] == 0 || kinds["chapter_status"] == 0 || kinds["checkpoint_saved"] == 0 {
 		t.Fatalf("event kinds = %#v", kinds)
 	}
-	// The prompt carried the quality plan and the evidence protocol
+	// The prompt carried the quality plan and the evidence protocol.
 	prompt := model.prompts[0]
-	if !strings.Contains(prompt, "ev_001") || !strings.Contains(prompt, "evidence_ids") {
-		t.Fatalf("writer prompt missing evidence protocol: %s", prompt)
+	for _, want := range []string{"ev_001", "evidence_ids", "Paper quality writing policy", "writer_notes"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("writer prompt missing %q: %s", want, prompt)
+		}
 	}
 }
 
@@ -338,6 +341,12 @@ func TestEditorRunnerVerifyReviewCommitChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunEditor(verify) error = %v", err)
 	}
+	verifyPrompt := editorModel.prompts[0]
+	for _, want := range []string{"Paper Quality verifier policy", "Claim support rubric", "same object, relation, and scope", "claim_type"} {
+		if !strings.Contains(verifyPrompt, want) {
+			t.Fatalf("verify prompt missing %q: %s", want, verifyPrompt)
+		}
+	}
 	if verifyResult.(map[string]any)["verdicts"] != 1 {
 		t.Fatalf("verify result = %#v", verifyResult)
 	}
@@ -350,6 +359,12 @@ func TestEditorRunnerVerifyReviewCommitChain(t *testing.T) {
 	reviewResult, err := editor.RunEditor(context.Background(), json.RawMessage(`{"task":"review","chapter_id":"ch01"}`))
 	if err != nil {
 		t.Fatalf("RunEditor(review) error = %v", err)
+	}
+	reviewPrompt := editorModel.prompts[1]
+	for _, want := range []string{"Paper Quality editor policy", "Reviewer rubric", "Rewrite rubric", "Human review trigger"} {
+		if !strings.Contains(reviewPrompt, want) {
+			t.Fatalf("review prompt missing %q: %s", want, reviewPrompt)
+		}
 	}
 	reviewMap := reviewResult.(map[string]any)
 	review := reviewMap["review"].(contracts.Review)
@@ -442,6 +457,11 @@ func TestArchitectRunnerOutlineEvidencePlanChain(t *testing.T) {
 	if _, err := architect.RunArchitect(context.Background(), json.RawMessage(`{"task":"outline"}`)); err != nil {
 		t.Fatalf("RunArchitect(outline) error = %v", err)
 	}
+	for _, want := range []string{"Paper Quality narrative policy", "Narrative contract", "chapter needs one clear role"} {
+		if !strings.Contains(model.prompts[0], want) {
+			t.Fatalf("outline prompt missing %q: %s", want, model.prompts[0])
+		}
+	}
 	var outline struct {
 		TitleSuggestion string `json:"title_suggestion"`
 		Chapters        []struct {
@@ -459,6 +479,11 @@ func TestArchitectRunnerOutlineEvidencePlanChain(t *testing.T) {
 	if _, err := architect.RunArchitect(context.Background(), json.RawMessage(`{"task":"evidence_extraction"}`)); err != nil {
 		t.Fatalf("RunArchitect(evidence_extraction) error = %v", err)
 	}
+	for _, want := range []string{"Paper Quality evidence-depth policy", "Evidence depth rubric", "Depth honesty"} {
+		if !strings.Contains(model.prompts[1], want) {
+			t.Fatalf("evidence prompt missing %q: %s", want, model.prompts[1])
+		}
+	}
 	table, err := quality.LoadEvidenceTable(s)
 	if err != nil || len(table.Items) != 1 || table.Items[0].ID != "ev_001" {
 		t.Fatalf("evidence table = %#v err = %v", table, err)
@@ -466,6 +491,11 @@ func TestArchitectRunnerOutlineEvidencePlanChain(t *testing.T) {
 
 	if _, err := architect.RunArchitect(context.Background(), json.RawMessage(`{"task":"section_quality_plan"}`)); err != nil {
 		t.Fatalf("RunArchitect(section_quality_plan) error = %v", err)
+	}
+	for _, want := range []string{"Paper Quality section-plan policy", "SectionPlan rubric", "forbidden_generalizations"} {
+		if !strings.Contains(model.prompts[2], want) {
+			t.Fatalf("section plan prompt missing %q: %s", want, model.prompts[2])
+		}
 	}
 	plan, err := quality.LoadSectionQualityPlan(s)
 	if err != nil || len(plan.Sections) != 1 || plan.Sections[0].ChapterID != "ch01" {
@@ -491,5 +521,233 @@ func TestJSONStringStreamerExtractsDraftAcrossDeltas(t *testing.T) {
 	}
 	if got := collected.String(); got != "## Title\n\nBody text." {
 		t.Fatalf("streamed draft = %q", got)
+	}
+}
+
+// writerReplyTwoClaims produces a chapter with two distinct claims, both bound
+// to ev_001, so the verifier can be scripted to omit one of them.
+func writerReplyTwoClaims(chenKey string) string {
+	out := map[string]any{
+		"draft_markdown": "## Therapist Guided CBT-I\n\nCBT-I improved sleep onset latency. It also reduced wake after sleep onset.",
+		"claims": []map[string]any{
+			{"id": "ch01_claim_001", "text": "CBT-I improves sleep onset latency.",
+				"importance": "high", "reference_keys": []string{chenKey}, "evidence_ids": []string{"ev_001"}, "confidence": 0.8},
+			{"id": "ch01_claim_002", "text": "CBT-I reduces wake after sleep onset.",
+				"importance": "medium", "reference_keys": []string{chenKey}, "evidence_ids": []string{"ev_001"}, "confidence": 0.7},
+		},
+		"citation_mappings": []map[string]any{{
+			"paragraph_id": "ch01_p001", "claim_ids": []string{"ch01_claim_001", "ch01_claim_002"},
+			"reference_keys": []string{chenKey},
+		}},
+		"writer_notes": "two evidence-grounded claims at abstract depth",
+	}
+	data, _ := json.Marshal(out)
+	return string(data)
+}
+
+// TestEditorRunnerVerifierMarksOmittedClaimsUnsupported locks in the runVerify
+// behavior change: when the model omits a verdict for a listed claim, the host
+// injects an unsupported/high-risk verdict for it instead of silently dropping
+// the claim.
+func TestEditorRunnerVerifierMarksOmittedClaimsUnsupported(t *testing.T) {
+	s, chenKey, _ := setupRunnerStore(t)
+
+	writerModel := &scriptedChatModel{replies: []string{writerReplyTwoClaims(chenKey)}}
+	writer, err := NewWriterRunner(RoleRunnerOptions{Config: runnerTestConfig(), Store: s, Model: writerModel})
+	if err != nil {
+		t.Fatalf("NewWriterRunner() error = %v", err)
+	}
+	if _, err := writer.RunWriter(context.Background(), json.RawMessage(`{"chapter_id":"ch01"}`)); err != nil {
+		t.Fatalf("RunWriter() error = %v", err)
+	}
+	if _, _, err := quality.ExtractChapterClaimGraph(s, "ch01", 1, false, time.Now().UTC()); err != nil {
+		t.Fatalf("ExtractChapterClaimGraph() error = %v", err)
+	}
+	graph, err := quality.LoadClaimGraph(s)
+	if err != nil || len(graph.Claims) != 2 {
+		t.Fatalf("claim graph = %#v err = %v", graph, err)
+	}
+	firstClaim := graph.Claims[0].ID
+	secondClaim := graph.Claims[1].ID
+
+	// The model returns a verdict for only the first claim, omitting the second.
+	omittedReply, _ := json.Marshal(map[string]any{
+		"verdicts": []map[string]any{{
+			"claim_id": firstClaim, "support": "supported", "risk_level": "low",
+			"verifier_note": "abstract evidence matches the moderate claim",
+		}},
+	})
+	editorModel := &scriptedChatModel{replies: []string{string(omittedReply)}}
+	editor, err := NewEditorRunner(RoleRunnerOptions{Config: runnerTestConfig(), Store: s, Model: editorModel})
+	if err != nil {
+		t.Fatalf("NewEditorRunner() error = %v", err)
+	}
+	verifyResult, err := editor.RunEditor(context.Background(), json.RawMessage(`{"task":"verify","chapter_id":"ch01"}`))
+	if err != nil {
+		t.Fatalf("RunEditor(verify) error = %v", err)
+	}
+	if verifyResult.(map[string]any)["verdicts"] != 2 {
+		t.Fatalf("expected 2 verdicts (1 model + 1 host-injected), got %#v", verifyResult)
+	}
+	verification, err := quality.LoadVerificationResult(s)
+	if err != nil || len(verification.Verdicts) != 2 {
+		t.Fatalf("verification = %#v err = %v", verification, err)
+	}
+	var omitted *quality.ClaimVerdict
+	for i := range verification.Verdicts {
+		if verification.Verdicts[i].ClaimID == secondClaim {
+			omitted = &verification.Verdicts[i]
+		}
+	}
+	if omitted == nil {
+		t.Fatalf("omitted claim %s has no verdict: %#v", secondClaim, verification.Verdicts)
+	}
+	if omitted.Support != quality.SupportUnsupported || omitted.RiskLevel != quality.RiskHigh {
+		t.Fatalf("omitted claim verdict = %#v, want unsupported/high", omitted)
+	}
+	if !strings.Contains(omitted.VerifierNote, "omitted") {
+		t.Fatalf("omitted claim note should explain the host injection: %q", omitted.VerifierNote)
+	}
+}
+
+// TestEditorRunnerQualityGateOverridesPassingReview locks in the
+// applyQualityConclusion behavior change: when the Editor's own review passes
+// (scores >= thresholds, no required fixes, no forced rewrite instruction) but
+// the claim-level quality gate concludes needs_revision, the review gate is
+// overridden to revision_required and the chapter is NOT auto-committed.
+//
+// A partially_supported claim in strict mode is the clean trigger: the review
+// guard does NOT force a rewrite instruction for partially_supported claims
+// (only unsupported/overstated/needs_rewrite), so the review can still pass,
+// while strict mode escalates partially_supported to needs_revision.
+func TestEditorRunnerQualityGateOverridesPassingReview(t *testing.T) {
+	s, chenKey, _ := setupRunnerStore(t)
+
+	// Escalate to strict mode so a partially_supported claim becomes
+	// needs_revision at the quality gate.
+	var req contracts.Requirements
+	if err := store.ReadJSON(s.RequirementsPath(), &req); err != nil {
+		t.Fatalf("read requirements: %v", err)
+	}
+	req.QualityMode = quality.ModeStrict
+	if _, err := store.WriteJSON(s.RequirementsPath(), req, store.Overwrite); err != nil {
+		t.Fatalf("write requirements: %v", err)
+	}
+
+	writerModel := &scriptedChatModel{replies: []string{writerReply(chenKey)}}
+	writer, err := NewWriterRunner(RoleRunnerOptions{Config: runnerTestConfig(), Store: s, Model: writerModel})
+	if err != nil {
+		t.Fatalf("NewWriterRunner() error = %v", err)
+	}
+	if _, err := writer.RunWriter(context.Background(), json.RawMessage(`{"chapter_id":"ch01"}`)); err != nil {
+		t.Fatalf("RunWriter() error = %v", err)
+	}
+	if _, _, err := quality.ExtractChapterClaimGraph(s, "ch01", 1, false, time.Now().UTC()); err != nil {
+		t.Fatalf("ExtractChapterClaimGraph() error = %v", err)
+	}
+	graph, err := quality.LoadClaimGraph(s)
+	if err != nil || len(graph.Claims) != 1 {
+		t.Fatalf("claim graph = %#v err = %v", graph, err)
+	}
+	claimID := graph.Claims[0].ID
+
+	// Verifier marks the claim partially_supported (medium risk): this does NOT
+	// force a rewrite instruction, so the review below can still pass on its own.
+	verdictReply, _ := json.Marshal(map[string]any{
+		"verdicts": []map[string]any{{
+			"claim_id": claimID, "support": "partially_supported", "risk_level": "medium",
+			"verifier_note": "abstract evidence only partially supports the claim",
+		}},
+	})
+	// The Editor's own review passes: scores above thresholds, no unsupported
+	// claims, no required rewrite instructions. Without applyQualityConclusion
+	// this chapter would be accepted.
+	reviewReply, _ := json.Marshal(map[string]any{
+		"scores": map[string]int{
+			"overall": 88, "citation_consistency": 95, "structure_logic": 86, "coverage": 85, "readability": 90,
+		},
+		"summary":              "Well-written chapter.",
+		"unsupported_claims":   []string{},
+		"required_fixes":       []string{},
+		"optional_fixes":       []string{"tighten the opening"},
+		"rewrite_instructions": []any{},
+	})
+	editorModel := &scriptedChatModel{replies: []string{string(verdictReply), string(reviewReply)}}
+	editor, err := NewEditorRunner(RoleRunnerOptions{Config: runnerTestConfig(), Store: s, Model: editorModel})
+	if err != nil {
+		t.Fatalf("NewEditorRunner() error = %v", err)
+	}
+	if _, err := editor.RunEditor(context.Background(), json.RawMessage(`{"task":"verify","chapter_id":"ch01"}`)); err != nil {
+		t.Fatalf("RunEditor(verify) error = %v", err)
+	}
+	reviewResult, err := editor.RunEditor(context.Background(), json.RawMessage(`{"task":"review","chapter_id":"ch01"}`))
+	if err != nil {
+		t.Fatalf("RunEditor(review) error = %v", err)
+	}
+	result := reviewResult.(map[string]any)
+	if result["quality_conclusion"] != quality.GateNeedsRevision {
+		t.Fatalf("quality_conclusion = %#v, want %q", result["quality_conclusion"], quality.GateNeedsRevision)
+	}
+	gate, ok := result["gate"].(artifacts.GateResult)
+	if !ok {
+		t.Fatalf("gate = %#v", result["gate"])
+	}
+	if gate.Passed || gate.Status != artifacts.StatusRevisionRequired {
+		t.Fatalf("gate = %#v, want Passed=false Status=%q (quality gate must override the passing review)", gate, artifacts.StatusRevisionRequired)
+	}
+	if result["auto_committed"] == true {
+		t.Fatalf("chapter must not be auto-committed when the quality gate overrides the review")
+	}
+	if _, statErr := os.Stat(s.Path("drafts", "ch01", "accepted.md")); !os.IsNotExist(statErr) {
+		t.Fatalf("accepted.md must not exist when quality gate overrides the review, stat = %v", statErr)
+	}
+}
+
+// TestWriterRunnerGuardsChapterWithPlanButNoEvidence locks in the writer_runner
+// guarded-condition change: a chapter that has a section quality plan and an
+// existing evidence table, but no resolvable evidence for this chapter, now
+// runs through the evidence guard (guarded=true) instead of degrading to
+// compatibility mode. The guard then blocks a claim that has no evidence to
+// bind, preventing unsupported writing.
+func TestWriterRunnerGuardsChapterWithPlanButNoEvidence(t *testing.T) {
+	s, chenKey, _ := setupRunnerStore(t)
+
+	// Rewrite the section plan so ch01 has no required evidence: the evidence
+	// table still exists, but BuildWriterChapterInput resolves an empty Evidence
+	// list for this chapter.
+	plan, err := quality.LoadSectionQualityPlan(s)
+	if err != nil {
+		t.Fatalf("LoadSectionQualityPlan() error = %v", err)
+	}
+	plan.Sections[0].RequiredEvidenceIDs = nil
+	if _, err := quality.SaveSectionQualityPlan(s, plan); err != nil {
+		t.Fatalf("SaveSectionQualityPlan() error = %v", err)
+	}
+
+	// The writer attempts a claim (with a confirmed reference) but has no
+	// evidence id to bind because none was resolved for the chapter.
+	noEvidenceReply, _ := json.Marshal(map[string]any{
+		"draft_markdown": "## Introduction\n\nThis review surveys CBT-I.",
+		"claims": []map[string]any{{
+			"id": "ch01_claim_001", "text": "CBT-I is a widely studied intervention.",
+			"importance": "high", "reference_keys": []string{chenKey}, "confidence": 0.6,
+		}},
+		"citation_mappings": []map[string]any{{
+			"paragraph_id": "ch01_p001", "claim_ids": []string{"ch01_claim_001"},
+			"reference_keys": []string{chenKey},
+		}},
+		"writer_notes": "",
+	})
+	model := &scriptedChatModel{replies: []string{string(noEvidenceReply)}}
+	writer, err := NewWriterRunner(RoleRunnerOptions{Config: runnerTestConfig(), Store: s, Model: model})
+	if err != nil {
+		t.Fatalf("NewWriterRunner() error = %v", err)
+	}
+	_, err = writer.RunWriter(context.Background(), json.RawMessage(`{"chapter_id":"ch01"}`))
+	if err == nil || !strings.Contains(err.Error(), aipagent.CodeClaimMissingEvidence) {
+		t.Fatalf("RunWriter() error = %v, want guard block %s (evidence guard must be active for plan+table chapters even without chapter evidence)", err, aipagent.CodeClaimMissingEvidence)
+	}
+	if _, statErr := os.Stat(s.Path("drafts", "ch01", "draft-v1.md")); !os.IsNotExist(statErr) {
+		t.Fatalf("guard failure must block the draft write, stat = %v", statErr)
 	}
 }

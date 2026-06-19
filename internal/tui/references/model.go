@@ -1,6 +1,7 @@
 package referencestui
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -9,6 +10,11 @@ import (
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/references"
 )
+
+// defaultMinConfirmed is the minimum number of references a user must confirm
+// before the References screen lets them proceed (BUG-20260618-01: avoid papers
+// built on too few sources). Callers can override per-screen via Options.
+const defaultMinConfirmed = 5
 
 type SortMode int
 
@@ -20,34 +26,43 @@ const (
 )
 
 type Options struct {
-	I18N i18n.T
+	I18N         i18n.T
+	MinConfirmed int
 }
 
 type Model struct {
-	candidates []contracts.ReferenceCandidate
-	cursor     int
-	selected   map[string]bool
-	rejected   map[string]bool
-	filter     string
-	searching  bool
-	sortMode   SortMode
-	done       bool
-	canceled   bool
-	err        error
-	i18n       i18n.T
+	candidates   []contracts.ReferenceCandidate
+	cursor       int
+	selected     map[string]bool
+	rejected     map[string]bool
+	filter       string
+	searching    bool
+	sortMode     SortMode
+	done         bool
+	canceled     bool
+	err          error
+	i18n         i18n.T
+	minConfirmed int
 }
 
 func NewModel(candidates contracts.ReferenceCandidates, opts ...Options) Model {
 	tr := i18n.New("")
-	if len(opts) > 0 && !opts[0].I18N.IsZero() {
-		tr = opts[0].I18N
+	minConfirmed := defaultMinConfirmed
+	if len(opts) > 0 {
+		if !opts[0].I18N.IsZero() {
+			tr = opts[0].I18N
+		}
+		if opts[0].MinConfirmed > 0 {
+			minConfirmed = opts[0].MinConfirmed
+		}
 	}
 	items := append([]contracts.ReferenceCandidate(nil), candidates.Items...)
 	return Model{
-		candidates: items,
-		selected:   map[string]bool{},
-		rejected:   map[string]bool{},
-		i18n:       tr,
+		candidates:   items,
+		selected:     map[string]bool{},
+		rejected:     map[string]bool{},
+		i18n:         tr,
+		minConfirmed: minConfirmed,
 	}
 }
 
@@ -82,8 +97,13 @@ func (m Model) UpdateKey(key string) Model {
 	case "r":
 		m.toggleRejected()
 	case "enter":
-		if len(m.selected) == 0 {
-			m.err = references.ConfirmError{Code: references.CodeNoneConfirmed, Message: m.i18n.Text(i18n.ReferencesErrNone)}
+		if len(m.selected) < m.minConfirmed {
+			if len(m.selected) == 0 {
+				m.err = references.ConfirmError{Code: references.CodeNoneConfirmed, Message: m.i18n.Text(i18n.ReferencesErrNone)}
+			} else {
+				m.err = references.ConfirmError{Code: references.CodeNoneConfirmed,
+					Message: fmt.Sprintf(m.i18n.Text(i18n.ReferencesErrTooFew), m.minConfirmed, len(m.selected))}
+			}
 			return m
 		}
 		m.done = true

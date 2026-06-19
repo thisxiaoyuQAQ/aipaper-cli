@@ -9,3 +9,7 @@ output
 .claude
 .codegraph
 aipaper.json
+
+# External reference skill repos cloned for distillation (not part of this project)
+docs/skills/AI-Research-SKILLs/
+docs/skills/awesome-ai-research-writing/

@@ -13,6 +13,9 @@ func TestCoordinatorSystemPromptIncludesHardRulesAndRecovery(t *testing.T) {
 		"references/confirmed.json",
 		"overall >= 80",
 		"checkpoint",
+		"Paper Quality Skill policy",
+		"citation existence is not claim support",
+		"evidence depth controls claim strength",
 		"do not overwrite drafts/ch01/draft.md",
 	} {
 		if !strings.Contains(prompt, want) {

@@ -1,6 +1,10 @@
 package agent
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/quality"
+)
 
 const (
 	RoleCoordinator = "coordinator"
@@ -25,6 +29,7 @@ func CoordinatorSystemPrompt(opts PromptOptions) string {
 		"Host must not decide rewrites from scores. You must decide after reading Editor facts.",
 		"Return concise structured JSON when the runtime requests a machine-readable decision.",
 	}
+	sections = append(sections, quality.PaperQualityCoordinatorSections()...)
 	sections = append(sections, qualityPromptSections()...)
 	sections = append(sections, writerQualityPromptSections()...)
 	sections = append(sections, claimGraphPromptSections()...)

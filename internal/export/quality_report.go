@@ -84,6 +84,7 @@ func RenderQualityReport(input ExportInput, generatedAt time.Time) string {
 
 	b.WriteString("# Quality Report\n\n")
 	fmt.Fprintf(&b, "- Generated at: `%s`\n", generatedAt.UTC().Format(time.RFC3339))
+	fmt.Fprintf(&b, "- Paper Quality policy: `%s`\n", quality.PaperQualityPolicyVersion)
 	fmt.Fprintf(&b, "- Quality mode: `%s`\n", mode)
 	fmt.Fprintf(&b, "- Overall quality status: `%s`\n", outcome.Conclusion)
 	fmt.Fprintf(&b, "- Claims checked: %d\n", len(q.ClaimGraph.Claims))
@@ -94,6 +95,7 @@ func RenderQualityReport(input ExportInput, generatedAt time.Time) string {
 	renderSupportSummary(&b, q.ClaimGraph)
 	renderUnsupportedAndOverstated(&b, q.ClaimGraph)
 	renderEvidenceSufficiencyFindings(&b, outcome)
+	renderHumanActionItems(&b, input, q.ClaimGraph, outcome)
 	renderNeedsHumanReview(&b, input, q.ClaimGraph, outcome, mode)
 	renderRewriteSummary(&b, input, q.ClaimGraph, outcome)
 	renderNextSteps(&b, q.ClaimGraph, outcome)
@@ -126,6 +128,7 @@ func renderGateIssueTable(b *strings.Builder, issues []quality.GateIssue) {
 
 func renderEvidenceDepthDistribution(b *strings.Builder, table quality.EvidenceTable) {
 	b.WriteString("## Evidence Depth Distribution\n\n")
+	b.WriteString("Evidence depth meaning: `metadata_only` supports only bibliographic existence or topic relevance; `abstract` supports high-level summaries; `snippet` supports only the quoted/local finding; `fulltext_excerpt` supports only what the excerpt actually covers. Strong causal, comparative, or broad generalization claims need evidence whose depth and scope match the wording.\n\n")
 	counts := evidenceDepthCounts(table)
 	b.WriteString("| Depth | Count |\n")
 	b.WriteString("| --- | ---: |\n")
@@ -190,6 +193,19 @@ func renderEvidenceSufficiencyFindings(b *strings.Builder, outcome quality.GateO
 	b.WriteString("\n")
 }
 
+func renderHumanActionItems(b *strings.Builder, input ExportInput, graph quality.ClaimGraph, outcome quality.GateOutcome) {
+	b.WriteString("## Human Action Items\n\n")
+	items := humanActionItems(input, graph, outcome)
+	if len(items) == 0 {
+		b.WriteString("- None\n\n")
+		return
+	}
+	for _, item := range items {
+		fmt.Fprintf(b, "- %s\n", item)
+	}
+	b.WriteString("\n")
+}
+
 func renderNeedsHumanReview(b *strings.Builder, input ExportInput, graph quality.ClaimGraph, outcome quality.GateOutcome, mode string) {
 	b.WriteString("## Needs Human Review\n\n")
 	topPriority, otherIssues := humanReviewIssues(outcome.Findings)
@@ -246,6 +262,53 @@ func renderRewriteSummary(b *strings.Builder, input ExportInput, graph quality.C
 			markdownCell(chapter.ID), rewriteRoundsForChapter(chapter), required, optional, needsRewriteByChapter[chapter.ID], convergence)
 	}
 	b.WriteString("\n")
+}
+
+func humanActionItems(input ExportInput, graph quality.ClaimGraph, outcome quality.GateOutcome) []string {
+	seen := map[string]bool{}
+	var items []string
+	add := func(item string) {
+		if item == "" || seen[item] {
+			return
+		}
+		seen[item] = true
+		items = append(items, item)
+	}
+	if len(outcome.Blockers) > 0 {
+		add("Resolve hard blockers before using the paper externally; unsupported or unbound claims must be rewritten, removed, or backed by confirmed evidence.")
+	}
+	for _, node := range graph.Claims {
+		switch node.Support {
+		case quality.SupportUnsupported:
+			add(fmt.Sprintf("Rewrite or remove unsupported claim `%s` in `%s`.", node.ID, node.ChapterID))
+		case quality.SupportOverstated:
+			add(fmt.Sprintf("Soften overstated claim `%s` in `%s` so its strength matches the cited evidence depth.", node.ID, node.ChapterID))
+		}
+		if node.NeedsHumanReview {
+			add(fmt.Sprintf("Manually review claim `%s` in `%s`; verifier/editor marked it beyond automatic repair.", node.ID, node.ChapterID))
+		}
+	}
+	if hasFinding(outcome.Findings, quality.CodeGateShallowEvidenceStrongClaim) || hasFinding(outcome.Findings, quality.CodeGateMetadataOnlySoleSupport) {
+		add("Upgrade shallow evidence for strong claims, or narrow those claims to abstract/metadata-level wording.")
+	}
+	if hasFinding(outcome.Findings, quality.CodeGateRequiredEvidenceUnused) {
+		add("Check required evidence that was not used; either revise the chapter to use it or update the section quality plan.")
+	}
+	for _, chapter := range input.Chapters {
+		if chapterNeedsHumanReview(chapter) {
+			add(fmt.Sprintf("Inspect chapter `%s`; the rewrite loop or review status marked it as needing human review.", chapter.ID))
+		}
+	}
+	for _, issue := range outcome.Findings {
+		if issue.Severity == quality.SeverityNeedsHumanReview {
+			if issue.ChapterID != "" {
+				add(fmt.Sprintf("Inspect `%s` for `%s`: %s", issue.ChapterID, issue.Code, issue.Message))
+			} else {
+				add(fmt.Sprintf("Inspect quality finding `%s`: %s", issue.Code, issue.Message))
+			}
+		}
+	}
+	return items
 }
 
 func renderNextSteps(b *strings.Builder, graph quality.ClaimGraph, outcome quality.GateOutcome) {

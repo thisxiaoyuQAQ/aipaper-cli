@@ -20,6 +20,12 @@ func TestRenderQualityReportWithFullArtifacts(t *testing.T) {
 	if !strings.Contains(report, "Quality mode: `enhanced`") {
 		t.Errorf("missing mode, got: %s", report)
 	}
+	if !strings.Contains(report, "Paper Quality policy: `"+quality.PaperQualityPolicyVersion+"`") {
+		t.Errorf("missing policy version, got: %s", report)
+	}
+	if !strings.Contains(report, "Evidence depth meaning") || !strings.Contains(report, "metadata_only") {
+		t.Errorf("missing evidence depth explanation, got: %s", report)
+	}
 	if !strings.Contains(report, "Overall quality status: `pass_with_warnings`") {
 		t.Errorf("missing conclusion, got: %s", report)
 	}

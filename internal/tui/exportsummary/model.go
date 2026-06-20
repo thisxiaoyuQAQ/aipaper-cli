@@ -49,7 +49,24 @@ type Model struct {
 	done     bool
 	canceled bool
 	i18n     i18n.T
+
+	// width/height let the view wrap long output/issue lines to the window.
+	width  int
+	height int
 }
+
+// SetSize injects terminal dimensions for wrapping. No-op when unset.
+func (m Model) SetSize(width, height int) Model {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// Width reports the last injected terminal width (0 when unset).
+func (m Model) Width() int { return m.width }
+
+// Height reports the last injected terminal height (0 when unset).
+func (m Model) Height() int { return m.height }
 
 // exportDoneMsg carries the outcome of an asynchronous export.
 type exportDoneMsg struct {

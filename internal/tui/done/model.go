@@ -9,6 +9,7 @@ import (
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/export"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/store"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/ui"
 )
 
 var (
@@ -41,7 +42,24 @@ type Model struct {
 	result export.Result
 	quit   bool
 	i18n   i18n.T
+
+	// width/height let the view wrap long output paths to the window.
+	width  int
+	height int
 }
+
+// SetSize injects terminal dimensions for wrapping. No-op when unset.
+func (m Model) SetSize(width, height int) Model {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// Width reports the last injected terminal width (0 when unset).
+func (m Model) Width() int { return m.width }
+
+// Height reports the last injected terminal height (0 when unset).
+func (m Model) Height() int { return m.height }
 
 // NewModel creates a new Done model.
 func NewModel(opts Options) Model {
@@ -132,5 +150,28 @@ func (m Model) View() string {
 
 	b.WriteString(hintStyle.Render(m.i18n.Text(i18n.DoneExitHint)))
 	b.WriteString("\n")
-	return b.String()
+	return m.wrapView(b.String())
+}
+
+// wrapView wraps each line of the rendered view to the terminal width so long
+// output paths no longer overflow the window. When the width is unknown the
+// view is returned unchanged.
+func (m Model) wrapView(content string) string {
+	if m.width <= 0 {
+		return content
+	}
+	width := m.width - 1
+	if width < 10 {
+		width = 10
+	}
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			out = append(out, "")
+			continue
+		}
+		out = append(out, ui.WrapCells(line, width)...)
+	}
+	return strings.Join(out, "\n")
 }

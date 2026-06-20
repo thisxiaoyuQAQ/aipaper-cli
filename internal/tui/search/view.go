@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/ui"
 	domainsearch "github.com/thisxiaoyuQAQ/aipaper-cli/internal/search"
 )
 
@@ -110,9 +111,39 @@ func (m Model) View() string {
 		panel.WriteString("\n")
 	}
 
-	b.WriteString(searchPanelStyle.Render(panel.String()))
+	b.WriteString(m.renderSearchPanel(panel.String()))
 	b.WriteString("\n")
 	return b.String()
+}
+
+// renderSearchPanel renders the panel content, wrapping long lines to the
+// terminal width so they no longer overflow the window. Content is wrapped
+// (not padded) so the panel auto-sizes to its widest line; we avoid setting
+// an explicit Width to prevent double-counting the border.
+func (m Model) renderSearchPanel(content string) string {
+	if m.width <= 0 {
+		return searchPanelStyle.Render(content)
+	}
+	innerWidth := m.width - 2 - 4 // border + horizontal padding
+	if innerWidth < 10 {
+		innerWidth = 10
+	}
+	return searchPanelStyle.Render(wrapPanelLines(content, innerWidth))
+}
+
+// wrapPanelLines wraps each line of content to width, preserving blank lines.
+func wrapPanelLines(content string, width int) string {
+	lines := strings.Split(content, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			out = append(out, "")
+			continue
+		}
+		wrapped := ui.WrapCells(line, width)
+		out = append(out, wrapped...)
+	}
+	return strings.Join(out, "\n")
 }
 
 func (m Model) formatProviderError(err domainsearch.ProviderError) string {

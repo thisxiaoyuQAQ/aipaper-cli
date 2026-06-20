@@ -43,7 +43,28 @@ type Model struct {
 	err          error
 	i18n         i18n.T
 	minConfirmed int
+
+	// width/height are the terminal dimensions injected by RootModel via
+	// SetSize. When zero (tests/zero-value) the view falls back to the
+	// original "render everything" layout so existing assertions hold.
+	width  int
+	height int
 }
+
+// SetSize injects the current terminal dimensions so the view can wrap long
+// lines and apply a scrolling viewport that fits the window. A zero or
+// negative value resets to the unrestricted layout.
+func (m Model) SetSize(width, height int) Model {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// Width reports the last injected terminal width (0 when unset).
+func (m Model) Width() int { return m.width }
+
+// Height reports the last injected terminal height (0 when unset).
+func (m Model) Height() int { return m.height }
 
 func NewModel(candidates contracts.ReferenceCandidates, opts ...Options) Model {
 	tr := i18n.New("")

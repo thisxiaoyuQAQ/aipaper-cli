@@ -86,6 +86,11 @@ type RootModel struct {
 	exitConfirm       bool
 	exitConfirmScreen Screen
 
+	// Terminal dimensions from the last tea.WindowSizeMsg, forwarded to the
+	// active screen so list-style views can wrap and scroll to fit.
+	width  int
+	height int
+
 	err error
 }
 
@@ -223,6 +228,11 @@ func (m RootModel) Init() tea.Cmd {
 
 func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m = m.applySizeToActiveScreen()
+		return m, nil
 	case ScreenTransitionMsg:
 		if !KnownScreen(msg.Next) {
 			m.err = fmt.Errorf("unknown screen %q", msg.Next)
@@ -277,27 +287,27 @@ func (m RootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.Next == ScreenMaterialsScan {
 			m.Materials = materialsModel
-			return m, m.Materials.Init()
+			return m.applySizeToActiveScreen(), m.Materials.Init()
 		}
 		if msg.Next == ScreenSearchProgress {
 			m.Search = searchModel
-			return m, m.Search.Init()
+			return m.applySizeToActiveScreen(), m.Search.Init()
 		}
 		if msg.Next == ScreenReferences {
 			m.References = referencesModel
-			return m, nil
+			return m.applySizeToActiveScreen(), nil
 		}
 		if msg.Next == ScreenWriting {
 			m.Writing = writingModel
-			return m, tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
+			return m.applySizeToActiveScreen(), tea.Batch(m.Writing.Init(), m.startWritingRuntimeCmd())
 		}
 		if msg.Next == ScreenExportSummary {
 			m.ExportSummary = newExportSummaryModel(m.WorkDir, m.i18n)
-			return m, m.ExportSummary.Init()
+			return m.applySizeToActiveScreen(), m.ExportSummary.Init()
 		}
 		if msg.Next == ScreenDone {
 			m.Done = newDoneModel(m.WorkDir, msg.Data, m.i18n)
-			return m, nil
+			return m.applySizeToActiveScreen(), nil
 		}
 	case materialstui.ScanFinishedMsg:
 		if m.CurrentScreen == ScreenMaterialsScan {
@@ -586,6 +596,29 @@ func (m RootModel) View() string {
 
 func (m RootModel) Err() error {
 	return m.err
+}
+
+// applySizeToActiveScreen forwards the last known terminal dimensions to the
+// currently active screen so list-style views can wrap and scroll to fit the
+// window. Screens without a SetSize method are left untouched. No-op when the
+// dimensions are unknown (zero), preserving the unrestricted layout.
+func (m RootModel) applySizeToActiveScreen() RootModel {
+	if m.width <= 0 || m.height <= 0 {
+		return m
+	}
+	switch m.CurrentScreen {
+	case ScreenReferences:
+		m.References = m.References.SetSize(m.width, m.height)
+	case ScreenMaterialsScan:
+		m.Materials = m.Materials.SetSize(m.width, m.height)
+	case ScreenSearchProgress:
+		m.Search = m.Search.SetSize(m.width, m.height)
+	case ScreenExportSummary:
+		m.ExportSummary = m.ExportSummary.SetSize(m.width, m.height)
+	case ScreenDone:
+		m.Done = m.Done.SetSize(m.width, m.height)
+	}
+	return m
 }
 
 func (m RootModel) updateRequirements(key string) (tea.Model, tea.Cmd) {

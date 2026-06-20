@@ -65,7 +65,25 @@ type Model struct {
 	action Action
 	err    error
 	i18n   i18n.T
+
+	// width/height let the view wrap long provider-error lines and fit the
+	// panel to the window. Zero falls back to the unrestricted layout.
+	width  int
+	height int
 }
+
+// SetSize injects terminal dimensions for wrapping/fitting. No-op when unset.
+func (m Model) SetSize(width, height int) Model {
+	m.width = width
+	m.height = height
+	return m
+}
+
+// Width reports the last injected terminal width (0 when unset).
+func (m Model) Width() int { return m.width }
+
+// Height reports the last injected terminal height (0 when unset).
+func (m Model) Height() int { return m.height }
 
 type SearchFinishedMsg struct {
 	Result domainsearch.Result

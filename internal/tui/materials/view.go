@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/i18n"
+	"github.com/thisxiaoyuQAQ/aipaper-cli/internal/tui/ui"
 )
 
 func (m Model) View() string {
@@ -60,8 +61,7 @@ func (m Model) View() string {
 			if item.Error != "" {
 				line += ": " + safeDisplayError(item.Error)
 			}
-			b.WriteString(line)
-			b.WriteString("\n")
+			b.WriteString(m.wrapLine(line))
 		}
 	}
 	if m.err != nil {
@@ -72,6 +72,34 @@ func (m Model) View() string {
 	b.WriteString(m.i18n.Text(i18n.MaterialsFooter))
 	b.WriteString("\n")
 	return b.String()
+}
+
+// wrapLine wraps a long manifest/error line to the terminal width and
+// rejoins with newlines, indenting continuation lines under the bullet. When
+// the width is unknown the line is returned unchanged.
+func (m Model) wrapLine(line string) string {
+	if m.width <= 0 {
+		return line + "\n"
+	}
+	width := m.width - 2
+	if width < 10 {
+		width = 10
+	}
+	wrapped := ui.WrapCells(line, width)
+	if len(wrapped) <= 1 {
+		return line + "\n"
+	}
+	var sb strings.Builder
+	for i, wl := range wrapped {
+		if i == 0 {
+			sb.WriteString(wl)
+		} else {
+			sb.WriteString("\n  ")
+			sb.WriteString(wl)
+		}
+	}
+	sb.WriteString("\n")
+	return sb.String()
 }
 
 func safeDisplayPath(path string) string {
